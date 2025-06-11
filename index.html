@@ -60,11 +60,6 @@
             align-items: center;
         }
 
-        .upload-section h3::before {
-            content: "📁";
-            margin-right: 10px;
-        }
-
         .file-input-container {
             position: relative;
             margin-bottom: 15px;
@@ -257,13 +252,13 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚚 CSV統合・変換アプリ</h1>
+            <h1>CSV統合・変換アプリ</h1>
             <p>Amazon・楽天・Yahooデータをヤマト運輸配送データCSVに変換</p>
         </div>
 
         <div class="main-content">
             <div class="upload-section">
-                <h3>📦 Amazonデータ (TSV形式)</h3>
+                <h3>Amazonデータ (TSV形式)</h3>
                 <div class="file-input-container">
                     <input type="file" id="amazonFile" class="file-input" accept=".txt,.tsv">
                     <label for="amazonFile" class="file-input-label">
@@ -274,7 +269,7 @@
             </div>
 
             <div class="upload-section">
-                <h3>🛍️ 楽天データ (CSV形式)</h3>
+                <h3>楽天データ (CSV形式)</h3>
                 <div class="file-input-container">
                     <input type="file" id="rakutenFile" class="file-input" accept=".csv">
                     <label for="rakutenFile" class="file-input-label">
@@ -285,7 +280,7 @@
             </div>
 
             <div class="upload-section">
-                <h3>🛒 Yahooデータ (CSV形式)</h3>
+                <h3>Yahooデータ (CSV形式)</h3>
                 <div class="file-input-container">
                     <input type="file" id="yahooFile" class="file-input" accept=".csv">
                     <label for="yahooFile" class="file-input-label">
@@ -296,7 +291,7 @@
             </div>
 
             <div class="upload-section">
-                <h3>📋 商品マスタ (Excel形式)</h3>
+                <h3>商品マスタ (Excel形式)</h3>
                 <div class="file-input-container">
                     <input type="file" id="masterFile" class="file-input" accept=".xlsx,.xlsm,.xls">
                     <label for="masterFile" class="file-input-label">
@@ -307,7 +302,7 @@
             </div>
 
             <button id="processButton" class="process-button" disabled>
-                🔄 データ変換を実行
+                データ変換を実行
             </button>
 
             <div id="progressContainer" class="progress-container">
@@ -318,11 +313,11 @@
             </div>
 
             <div id="resultSection" class="result-section">
-                <h3>✅ 変換完了</h3>
+                <h3>変換完了</h3>
                 <div class="stats" id="statsContainer"></div>
                 <div style="text-align: center; margin-top: 20px;">
                     <a id="downloadButton" class="download-button" style="display: none;">
-                        📥 ヤマト運輸配送データをダウンロード
+                        ヤマト運輸配送データをダウンロード
                     </a>
                 </div>
                 <div id="errorLog" class="error-log" style="display: none;"></div>
@@ -371,14 +366,14 @@
                 const status = document.getElementById(`${type}Status`);
                 const inputLabel = document.querySelector(`label[for="${type}File"]`);
                 
-                label.textContent = `✅ ${file.name}`;
+                label.textContent = `ファイル選択済み: ${file.name}`;
                 inputLabel.classList.add('has-file');
                 
                 try {
                     // Validate file and show preview
                     await this.validateFile(file, type);
                     status.className = 'file-status success';
-                    status.textContent = `✅ ファイルを読み込みました (${this.formatFileSize(file.size)})`;
+                    status.textContent = `ファイルを読み込みました (${this.formatFileSize(file.size)})`;
                     status.style.display = 'block';
                     
                     if (type === 'master') {
@@ -386,7 +381,7 @@
                     }
                 } catch (error) {
                     status.className = 'file-status error';
-                    status.textContent = `❌ エラー: ${error.message}`;
+                    status.textContent = `エラー: ${error.message}`;
                     status.style.display = 'block';
                     this.files[type] = null;
                     inputLabel.classList.remove('has-file');
@@ -469,9 +464,9 @@
                 
                 button.disabled = !allFilesSelected;
                 if (allFilesSelected) {
-                    button.textContent = '🔄 データ変換を実行';
+                    button.textContent = 'データ変換を実行';
                 } else {
-                    button.textContent = '📁 すべてのファイルを選択してください';
+                    button.textContent = 'すべてのファイルを選択してください';
                 }
             }
 
@@ -512,19 +507,41 @@
                     const outputCSV = this.generateYamatoCSV(mergedData);
                     
                     // Complete
-                    progressText.textContent = '✅ 変換完了!';
+                    progressText.textContent = '変換完了!';
                     this.showResults(mergedData, outputCSV);
                     
                 } catch (error) {
                     console.error('Processing error:', error);
                     this.errors.push(error.message);
-                    progressText.textContent = '❌ 処理中にエラーが発生しました';
+                    progressText.textContent = '処理中にエラーが発生しました';
                     this.showResults([], null);
                 }
             }
 
             async readAmazonData() {
-                const text = await this.files.amazon.text();
+                const arrayBuffer = await this.files.amazon.arrayBuffer();
+                
+                // Amazon データの文字エンコーディングを適切に処理
+                let text;
+                try {
+                    // まずUTF-8で試す
+                    text = new TextDecoder('utf-8').decode(arrayBuffer);
+                    
+                    // 文字化けしているかチェック（簡単な判定）
+                    if (text.includes('�') || text.includes('\uFFFD')) {
+                        // Shift-JISで再試行
+                        const uint8Array = new Uint8Array(arrayBuffer);
+                        const sjisDecoded = Encoding.convert(uint8Array, {
+                            to: 'UNICODE',
+                            from: 'SJIS'
+                        });
+                        text = Encoding.codeToString(sjisDecoded);
+                    }
+                } catch (e) {
+                    // エラーの場合はUTF-8でフォールバック
+                    text = new TextDecoder('utf-8').decode(arrayBuffer);
+                }
+                
                 const lines = text.split('\n').filter(line => line.trim());
                 if (lines.length < 2) throw new Error('Amazonデータが空です');
                 
@@ -547,19 +564,30 @@
             async readRakutenData() {
                 const arrayBuffer = await this.files.rakuten.arrayBuffer();
                 
-                // Try to detect encoding and convert
+                // 楽天データの文字エンコーディングを適切に処理
                 let text;
                 try {
-                    // Try Shift-JIS first
+                    // Shift-JISで試す
                     const uint8Array = new Uint8Array(arrayBuffer);
                     const sjisDecoded = Encoding.convert(uint8Array, {
                         to: 'UNICODE',
                         from: 'SJIS'
                     });
                     text = Encoding.codeToString(sjisDecoded);
+                    
+                    // 文字化けしているかチェック
+                    if (text.includes('�') || text.includes('\uFFFD')) {
+                        // UTF-8で再試行
+                        text = new TextDecoder('utf-8').decode(arrayBuffer);
+                    }
                 } catch (e) {
-                    // Fallback to UTF-8
-                    text = new TextDecoder('utf-8').decode(arrayBuffer);
+                    try {
+                        // UTF-8でフォールバック
+                        text = new TextDecoder('utf-8').decode(arrayBuffer);
+                    } catch (e2) {
+                        // 最後の手段：Latin-1で読み込み
+                        text = new TextDecoder('latin-1').decode(arrayBuffer);
+                    }
                 }
                 
                 const lines = text.split('\n').filter(line => line.trim());
@@ -582,7 +610,29 @@
             }
 
             async readYahooData() {
-                const text = await this.files.yahoo.text();
+                const arrayBuffer = await this.files.yahoo.arrayBuffer();
+                
+                // Yahooデータの文字エンコーディングを適切に処理
+                let text;
+                try {
+                    // UTF-8で試す
+                    text = new TextDecoder('utf-8').decode(arrayBuffer);
+                    
+                    // 文字化けしているかチェック
+                    if (text.includes('�') || text.includes('\uFFFD')) {
+                        // Shift-JISで再試行
+                        const uint8Array = new Uint8Array(arrayBuffer);
+                        const sjisDecoded = Encoding.convert(uint8Array, {
+                            to: 'UNICODE',
+                            from: 'SJIS'
+                        });
+                        text = Encoding.codeToString(sjisDecoded);
+                    }
+                } catch (e) {
+                    // フォールバック
+                    text = new TextDecoder('utf-8').decode(arrayBuffer);
+                }
+                
                 const lines = text.split('\n').filter(line => line.trim());
                 if (lines.length < 2) throw new Error('Yahooデータが空です');
                 
@@ -671,6 +721,9 @@
                     const totalWeight = productInfo.weight * quantity;
                     const productName = this.formatProductName(productInfo, quantity);
                     
+                    // Amazon販売ID: "order-id":"order-item-id":"quantity-purchased"
+                    const salesId = `${row['order-id'] || ''}:${row['order-item-id'] || ''}:${quantity}`;
+                    
                     return {
                         platform: 'Amazon',
                         orderId: row['order-id'] || '',
@@ -687,7 +740,7 @@
                         productName: productName,
                         totalWeight: totalWeight,
                         orderDate: this.formatDate(row['purchase-date'] || ''),
-                        salesId: row['order-item-id'] || row['order-id'] || ''
+                        salesId: salesId
                     };
                 } catch (error) {
                     this.errors.push(`Amazon注文処理エラー: ${error.message}`);
@@ -697,8 +750,8 @@
 
             transformRakutenOrder(row) {
                 try {
-                    // Rakuten specific field mapping - adjust based on actual data structure
-                    const productId = row['商品ID'] || row['商品コード'] || '';
+                    // 楽天は「商品管理番号」で商品マスタから探す
+                    const productId = row['商品管理番号'] || '';
                     const productInfo = this.findProductInfo(productId, '楽天');
                     
                     if (!productInfo) {
@@ -736,11 +789,16 @@
 
             transformYahooOrder(row) {
                 try {
+                    // Yahoo!は「ItemId」からL1=xxx&L2=yyyのような形式を解析
                     const itemId = row['ItemId'] || '';
-                    const productInfo = this.findProductInfo(itemId, 'Yahoo');
+                    const productCodes = this.parseYahooItemId(itemId);
+                    
+                    // 複数商品コードがある場合は最初のものを使用
+                    const mainProductCode = productCodes.length > 0 ? productCodes[0] : itemId;
+                    const productInfo = this.findProductInfo(mainProductCode, 'Yahoo');
                     
                     if (!productInfo) {
-                        this.errors.push(`商品マスタに見つかりません: ${itemId} (Yahoo)`);
+                        this.errors.push(`商品マスタに見つかりません: ${mainProductCode} (Yahoo)`);
                         return null;
                     }
                     
@@ -772,11 +830,42 @@
                 }
             }
 
+            parseYahooItemId(itemId) {
+                // Yahoo!の商品IDからL1=608やL1=bara60&L2=bara80のような形式を解析
+                const productCodes = [];
+                
+                if (!itemId) return productCodes;
+                
+                // L1=xxx形式を検索
+                const l1Match = itemId.match(/L1=([^&]+)/);
+                if (l1Match) {
+                    productCodes.push(l1Match[1]);
+                }
+                
+                // L2=xxx形式を検索
+                const l2Match = itemId.match(/L2=([^&]+)/);
+                if (l2Match) {
+                    productCodes.push(l2Match[1]);
+                }
+                
+                // L3以降も対応
+                const l3Match = itemId.match(/L3=([^&]+)/);
+                if (l3Match) {
+                    productCodes.push(l3Match[1]);
+                }
+                
+                // L1=形式が見つからない場合は、ItemId全体を商品コードとして使用
+                if (productCodes.length === 0) {
+                    productCodes.push(itemId);
+                }
+                
+                return productCodes;
+            }
+
             findProductInfo(productCode, platform) {
+                // 指定された販売サイトの中から商品を検索
                 for (const product of this.productMaster) {
-                    if (product.productNo === productCode || 
-                        (platform && product.platform === platform && product.productNo === productCode)) {
-                        
+                    if (product.platform === platform && product.productNo === productCode) {
                         // Return the first variation as default
                         if (product.variations.length > 0) {
                             const variation = product.variations[0];
@@ -793,9 +882,9 @@
             }
 
             formatProductName(productInfo, orderQuantity) {
-                // Format: "色": "重さ"×"個数"
+                // Format: 色: 重さg×個数 (ダブルクォーテーション不要)
                 const totalQuantity = orderQuantity || productInfo.quantity;
-                return `"${productInfo.color}": "${productInfo.weight}g"×"${totalQuantity}"`;
+                return `${productInfo.color}: ${productInfo.weight}g×${totalQuantity}`;
             }
 
             formatPhoneNumber(phone) {
@@ -971,7 +1060,7 @@
                 if (this.errors.length > 0) {
                     errorLog.style.display = 'block';
                     errorLog.innerHTML = `
-                        <h4>⚠️ 警告・エラーログ</h4>
+                        <h4>警告・エラーログ</h4>
                         <ul>
                             ${this.errors.map(error => `<li>${error}</li>`).join('')}
                         </ul>
