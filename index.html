@@ -713,6 +713,8 @@
                 
                 // 配送先情報
                 const shipNameField = findField(['送付先名前', '送付先氏名', '配送先名', 'Ship']);
+                const shipLastNameField = findField(['送付先姓', '送付先Last']);
+                const shipFirstNameField = findField(['送付先名', '送付先First']);
                 const shipZip1Field = findField(['送付先郵便番号1', '郵便番号1', 'Zip1']);
                 const shipZip2Field = findField(['送付先郵便番号2', '郵便番号2', 'Zip2']);
                 const shipPrefField = findField(['送付先住所都道府県', '都道府県', 'Prefecture']);
@@ -725,7 +727,8 @@
                 debugLog(`商品管理番号: ${productIdField}`);
                 debugLog(`商品名: ${productNameField}`);
                 debugLog(`個数: ${quantityField}`);
-                debugLog(`送付先名前: ${shipNameField}`);
+                debugLog(`送付先姓: ${shipLastNameField}`);
+                debugLog(`送付先名: ${shipFirstNameField}`);
                 
                 rakutenParsed.data.forEach((row, index) => {
                     try {
@@ -733,13 +736,23 @@
                         const productId = row[productIdField];
                         const productName = row[productNameField];
                         const quantity = parseInt(row[quantityField]) || 1;
-                        const shipName = cleanText(row[shipNameField]);
+                        
+                        // 送付先名前を姓+名で結合
+                        const shipLastName = cleanText(row[shipLastNameField] || '');
+                        const shipFirstName = cleanText(row[shipFirstNameField] || '');
+                        const shipName = (shipLastName + ' ' + shipFirstName).trim();
+                        
                         const shipZip1 = row[shipZip1Field];
                         const shipZip2 = row[shipZip2Field];
                         const shipPref = row[shipPrefField];
                         const shipCity = row[shipCityField];
                         const shipAddr = row[shipAddrField];
-                        const shipPhone = row[shipPhoneField];
+                        const shipPhone1 = row[shipPhoneField];
+                        const shipPhone2 = row[findField(['送付先電話番号2'])];
+                        const shipPhone3 = row[findField(['送付先電話番号3'])];
+                        
+                        // 電話番号を結合
+                        const shipPhone = `${shipPhone1 || ''}-${shipPhone2 || ''}-${shipPhone3 || ''}`.replace(/^-+|-+$/g, '');
 
                         debugLog(`楽天行${index + 1}: 注文=${orderId}, 商品=${productId}, 名前=${shipName}`);
 
@@ -749,9 +762,9 @@
                             
                             // 商品マスタから情報取得
                             const masterInfo = findProductInMaster('楽天', productId);
-                            let weight = 50;
+                            let weight = 60; // 楽天のデフォルト重量を調整
                             let productDetail = '商品';
-                            let color = '金';
+                            let color = '銀';
 
                             if (masterInfo && masterInfo.variations.length > 0) {
                                 const variation = masterInfo.variations[0];
@@ -760,7 +773,28 @@
                                 productDetail = `${color}: ${variation.weight}gx${quantity}`;
                                 debugLog(`商品マスタ発見: ${productId} -> ${productDetail}`);
                             } else {
-                                debugLog(`商品マスタ未発見: ${productId}`);
+                                // 商品マスタに見つからない場合は商品名から推定
+                                debugLog(`商品マスタ未発見: ${productId}, 商品名から推定`);
+                                if (productName) {
+                                    // 商品名から重量を抽出
+                                    const weightMatches = productName.match(/(\d+)g/g);
+                                    if (weightMatches) {
+                                        const weights = weightMatches.map(w => parseInt(w));
+                                        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+                                        weight = totalWeight * quantity;
+                                        productDetail = `${color}: ${Math.round(totalWeight / weights.length)}gx${quantity}`;
+                                        debugLog(`商品名から重量推定: ${totalWeight}g`);
+                                    } else {
+                                        // セット商品の場合のデフォルト重量
+                                        if (productName.includes('セット') || productName.includes('4個')) {
+                                            weight = 240 * quantity; // 4個セットの推定重量
+                                            productDetail = `${color}: 60gx${4 * quantity}`;
+                                        } else {
+                                            weight = 60 * quantity;
+                                            productDetail = `${color}: 60gx${quantity}`;
+                                        }
+                                    }
+                                }
                             }
 
                             result.push({
@@ -777,6 +811,10 @@
                                 productDetail: productDetail,
                                 color: color
                             });
+                            
+                            debugLog(`楽天データ追加成功: ${shipName} (${weight}g)`);
+                        } else {
+                            debugLog(`楽天行${index + 1}スキップ: 必須データ不足`);
                         }
                     } catch (error) {
                         debugLog(`楽天行${index + 1}処理エラー: ${error.message}`);
