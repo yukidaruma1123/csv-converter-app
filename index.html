@@ -754,7 +754,6 @@
                     const shipZip = row['ShipZipCode'];
                     const shipPhone = row['ShipPhoneNumber'];
                     const quantityDetail = row['QuantityDetail'];
-                    const subCode = row['SubCode'];
 
                     if (shipName && shipAddress && shipZip) {
                         // Yahoo!の複数商品処理（&で区切られた商品）
@@ -763,15 +762,21 @@
                             const quantities = quantityDetail ? quantityDetail.split('&') : [];
                             
                             items.forEach((item, index) => {
-                                const cleanItemId = item.replace(/L\d+=/g, ''); // L1=bara60 → bara60
+                                // L〇=の後の文字列を抽出（例：L1=608 → 608、L2=bara60 → bara60）
+                                const match = item.match(/L\d+=(.+)/);
+                                const cleanItemId = match ? match[1] : item;
+                                
+                                // 対応する注文数を取得（例：1&2 → [1, 2]）
                                 const quantity = parseInt(quantities[index]) || 1;
+                                
+                                console.log(`Yahoo処理: 元ID=${item}, 抽出ID=${cleanItemId}, 数量=${quantity}`);
                                 
                                 // 商品マスタから情報取得（厳密検索）
                                 const masterKey = `Yahoo_${cleanItemId}`;
                                 const masterInfo = productMaster[masterKey];
                                 
                                 if (!masterInfo) {
-                                    errors.push(`Yahoo商品マスタ未登録: ItemId=${cleanItemId}, OrderId=${orderId}`);
+                                    errors.push(`Yahoo商品マスタ未登録: ItemId=${cleanItemId} (元=${item}), OrderId=${orderId}`);
                                     return;
                                 }
                                 
@@ -793,15 +798,23 @@
                                 });
                             });
                         } else {
-                            // 単一商品の場合
+                            // 単一商品の場合でもL〇=形式かチェック
+                            let cleanItemId = itemIdFull;
+                            const match = itemIdFull.match(/L\d+=(.+)/);
+                            if (match) {
+                                cleanItemId = match[1];
+                            }
+                            
                             const quantity = parseInt(quantityDetail) || 1;
                             
+                            console.log(`Yahoo単一処理: 元ID=${itemIdFull}, 抽出ID=${cleanItemId}, 数量=${quantity}`);
+                            
                             // 商品マスタから情報取得（厳密検索）
-                            const masterKey = `Yahoo_${itemIdFull}`;
+                            const masterKey = `Yahoo_${cleanItemId}`;
                             const masterInfo = productMaster[masterKey];
                             
                             if (!masterInfo) {
-                                errors.push(`Yahoo商品マスタ未登録: ItemId=${itemIdFull}, OrderId=${orderId}`);
+                                errors.push(`Yahoo商品マスタ未登録: ItemId=${cleanItemId} (元=${itemIdFull}), OrderId=${orderId}`);
                                 return;
                             }
                             
@@ -811,7 +824,7 @@
 
                             result.push({
                                 source: 'Yahoo',
-                                sku: itemIdFull,
+                                sku: cleanItemId,
                                 productName: itemDescription,
                                 quantity: quantity,
                                 recipientName: shipName,
