@@ -760,11 +760,26 @@
                         // 複数商品の場合（例: L1=bara60&L2=bara80）
                         const items = itemId.split('&');
                         items.forEach(item => {
-                            const [itemCode, subCode] = item.split('=');
-                            const cleanItemCode = itemCode.replace(/^L\d+=/, '');
-                            const quantity = parseInt(quantityDetail?.match(new RegExp(`${cleanItemCode}:(\\d+)`))?.[1]) || 1;
+                            // L1=bara60 -> bara60 を抽出
+                            let cleanItemCode = '';
+                            if (item.includes('=')) {
+                                cleanItemCode = item.split('=')[1]; // = より後ろを取得
+                            } else {
+                                cleanItemCode = item.trim();
+                            }
+                            
+                            console.log(`Yahoo multiple item: ${item} -> ${cleanItemCode}`);
+                            
+                            // QuantityDetailから該当商品の数量を取得（例: bara60:2,bara80:1）
+                            let quantity = 1;
+                            if (quantityDetail) {
+                                const quantityMatch = quantityDetail.match(new RegExp(`${cleanItemCode}:(\\d+)`));
+                                quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+                            }
                             
                             const masterInfo = productMaster[cleanItemCode];
+                            console.log(`Searching for ${cleanItemCode}:`, masterInfo);
+                            
                             if (masterInfo) {
                                 // 総重量 = (D列×E列) × 注文数
                                 const unitWeight = masterInfo.weight || 50; // D列
@@ -774,6 +789,7 @@
                                 productDetails.push(`${masterInfo.color}: ${unitWeight}g×${unitQuantity}`);
                                 totalQuantity += quantity;
                             } else {
+                                console.log(`Product not found in master: ${cleanItemCode}`);
                                 totalWeight += 50 * quantity;
                                 productDetails.push(`不明商品: ${cleanItemCode}`);
                                 totalQuantity += quantity;
@@ -782,7 +798,10 @@
                     } else {
                         // 単一商品の場合
                         const quantity = parseInt(quantityDetail) || 1;
+                        
+                        console.log(`Yahoo single item: ${itemId}`);
                         const masterInfo = productMaster[itemId];
+                        console.log(`Searching for ${itemId}:`, masterInfo);
                         
                         if (masterInfo) {
                             // 総重量 = (D列×E列) × 注文数
@@ -791,6 +810,7 @@
                             totalWeight = (unitWeight * unitQuantity) * quantity;
                             productDetails.push(`${masterInfo.color}: ${unitWeight}g×${unitQuantity}`);
                         } else {
+                            console.log(`Product not found in master: ${itemId}`);
                             // 商品マスタにない場合、タイトルから重量推定
                             const weightMatch = title?.match(/(\d+)g/);
                             totalWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
