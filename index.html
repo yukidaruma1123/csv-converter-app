@@ -333,9 +333,25 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
-        // グローバル変数
-        let productMasterData = null;
-        let warnings = [];
+        // 商品マスタデータ（初期の方式に戻し、実際のファイルからの読み込みも追加）
+        let productMaster = {
+            // デフォルトサンプルデータ
+            "jg152": { site: "Yahoo", detail: "15g 2個入 ゴールド金 メタルジグ", weight: 15, quantity: 2, color: "金" },
+            "jg156": { site: "Yahoo", detail: "15g 6個入 ゴールド金 メタルジグ", weight: 15, quantity: 6, color: "金" },
+            "E6-0CH8-6Q1F": { site: "Amazon", detail: "バラ売り 45g 60g 80g 100g (色指定) タイラバ", weight: 60, quantity: 1, color: "金" },
+            "PB-BVHJ-U5T9": { site: "Amazon", detail: "3個セット (150g) 深ラバ タイラバ", weight: 150, quantity: 3, color: "金" },
+            "7R-JWN3-TP62": { site: "Amazon", detail: "3個セット(80g) 深ラバ タイラバ", weight: 80, quantity: 3, color: "金" },
+            "8J-R9XT-UC8R": { site: "Amazon", detail: "3個セット(45g) 深ラバ タイラバ", weight: 45, quantity: 3, color: "金" },
+            "DX-8VPL-W24D": { site: "Amazon", detail: "3個セット(60g) 深ラバ タイラバ", weight: 60, quantity: 3, color: "金" },
+            "GF-L5Z0-WWSE": { site: "Amazon", detail: "3個セット(100g) 深ラバ タイラバ", weight: 100, quantity: 3, color: "金" },
+            "AI-N2TW-JST2": { site: "Amazon", detail: "バラ売り 45g 60g 80g 100g (色指定) タイラバ", weight: 60, quantity: 1, color: "金" },
+            "VU-JCJC-XANI": { site: "Amazon", detail: "バラ売り 45g 60g 80g 100g (色指定) タイラバ", weight: 80, quantity: 1, color: "金" },
+            "BV-ZI9J-146V": { site: "Amazon", detail: "バラ売り 45g 60g 80g 100g (色指定) タイラバ", weight: 100, quantity: 1, color: "金" },
+            // Yahoo商品の追加
+            "608": { site: "Yahoo", detail: "タイラバ 60g", weight: 60, quantity: 1, color: "金" },
+            "bara60": { site: "Yahoo", detail: "バラ売り 60g タイラバ", weight: 60, quantity: 1, color: "金" },
+            "bara80": { site: "Yahoo", detail: "バラ売り 80g タイラバ", weight: 80, quantity: 1, color: "金" }
+        };
 
         // DOM要素
         const productMasterFile = document.getElementById('productMasterFile');
@@ -365,6 +381,10 @@
         rakutenFile.addEventListener('change', (e) => handleFileSelect(e, 'rakuten', 'rakutenStatus'));
         yahooFile.addEventListener('change', (e) => handleFileSelect(e, 'yahoo', 'yahooStatus'));
 
+        // グローバル変数
+        let productMasterData = null;
+        let warnings = [];
+
         async function handleProductMasterSelect(event) {
             const file = event.target.files[0];
             const statusElement = document.getElementById('productMasterStatus');
@@ -374,22 +394,27 @@
                     selectedFiles.productMaster = file;
                     statusElement.textContent = '商品マスタを読み込み中...';
                     
-                    productMasterData = await loadProductMaster(file);
+                    const newMasterData = await loadProductMaster(file);
                     
-                    statusElement.textContent = `商品マスタ読み込み完了: ${Object.keys(productMasterData).length}件`;
+                    // デフォルトの商品マスタと統合
+                    productMaster = { ...productMaster, ...newMasterData };
+                    productMasterData = productMaster; // 後方互換性のため
+                    
+                    statusElement.textContent = `商品マスタ読み込み完了: ${Object.keys(productMaster).length}件`;
                     statusElement.className = 'product-master-status loaded';
                     event.target.classList.add('has-file');
                     
-                    console.log('Product master loaded:', Object.keys(productMasterData).length, 'items');
+                    console.log('Product master loaded:', Object.keys(productMaster).length, 'items');
+                    console.log('Sample keys:', Object.keys(productMaster).slice(0, 10));
                 } catch (error) {
                     console.error('商品マスタ読み込みエラー:', error);
                     statusElement.textContent = '商品マスタの読み込みに失敗しました';
                     statusElement.className = 'product-master-status';
-                    productMasterData = null;
                 }
             } else {
                 selectedFiles.productMaster = null;
-                productMasterData = null;
+                // デフォルト商品マスタに戻す
+                productMasterData = productMaster;
                 statusElement.textContent = '商品マスタファイル（Excel または CSV）を選択してください';
                 statusElement.className = 'product-master-status';
                 event.target.classList.remove('has-file');
@@ -504,7 +529,9 @@
         }
 
         function updateConvertButton() {
-            const allFilesSelected = productMasterData && selectedFiles.amazon && selectedFiles.rakuten && selectedFiles.yahoo;
+            // デフォルト商品マスタは常に利用可能
+            const hasMasterData = productMaster && Object.keys(productMaster).length > 0;
+            const allFilesSelected = hasMasterData && selectedFiles.amazon && selectedFiles.rakuten && selectedFiles.yahoo;
             convertButton.disabled = !allFilesSelected;
         }
 
@@ -638,7 +665,7 @@
         async function convertToYamatoFormat(amazonData, rakutenData, yahooData) {
             const result = [];
 
-            // Amazonデータ処理
+            // Amazonデータ処理（初期の方式に戻す）
             const amazonLines = amazonData.split('\n').filter(line => line.trim());
             if (amazonLines.length > 1) {
                 const amazonHeaders = amazonLines[0].split('\t');
@@ -647,55 +674,30 @@
                     const fields = amazonLines[i].split('\t');
                     if (fields.length < amazonHeaders.length) continue;
 
-                    const sku = fields[11];
-                    const productName = fields[13];
-                    const quantity = parseInt(fields[14]) || 1;
-                    const recipientName = fields[19];
-                    const shipAddress = fields[20];
-                    const zipCode = fields[25];
-                    const phoneNumber = fields[10];
-                    const orderId = fields[0];
-                    const orderItemId = fields[1];
+                    const sku = fields[11]; // sku
+                    const productName = fields[13]; // product-name
+                    const quantity = parseInt(fields[14]) || 1; // quantity-purchased
+                    const recipientName = fields[19]; // recipient-name
+                    const shipAddress = fields[20]; // ship-address-1
+                    const zipCode = fields[25]; // ship-postal-code
+                    const phoneNumber = fields[10]; // buyer-phone-number
 
-                    console.log(`Amazon商品検索: ${sku}`);
-
-                    // 商品マスタから情報取得
-                    const masterInfo = productMasterData[sku];
-                    let weight = 50; // デフォルト値
-                    let productDetail = productName || '';
-
-                    if (masterInfo) {
-                        console.log(`Amazon商品マスタ発見: ${sku} (行${masterInfo.rowIndex}) - サイト:${masterInfo.site}`);
-                        
-                        // Amazon商品またはサイト情報が空の場合も受け入れる
-                        if (masterInfo.site === 'Amazon' || masterInfo.site === '' || masterInfo.site.toLowerCase().includes('amazon')) {
-                            weight = (masterInfo.weight * masterInfo.quantity) * quantity;
-                            productDetail = `${masterInfo.color}: ${masterInfo.weight}g×${masterInfo.quantity}個×${quantity}`;
-                            console.log(`Amazon商品マスタ適用: 重量=${weight}g`);
-                        } else {
-                            console.log(`Amazon商品のサイト不一致: ${masterInfo.site}`);
-                            warnings.push(`Amazon商品 ${sku} のサイト情報が一致しません (${masterInfo.site})`);
-                            weight = 50 * quantity;
-                        }
-                    } else {
-                        console.log(`Amazon商品マスタ未発見: ${sku}`);
-                        console.log('利用可能な商品No:', Object.keys(productMasterData).filter(key => key.includes(sku) || sku.includes(key)));
-                        warnings.push(`Amazon商品 ${sku} が商品マスタに見つかりません`);
-                        weight = 50 * quantity;
-                    }
+                    // 商品マスタから重量情報取得（初期の方式）
+                    const masterInfo = productMaster[sku];
+                    const weight = masterInfo ? masterInfo.weight * masterInfo.quantity * quantity : 50 * quantity;
 
                     if (recipientName && shipAddress && zipCode) {
                         result.push({
                             source: 'Amazon',
                             sku: sku,
-                            productName: productDetail,
+                            productName: productName,
                             quantity: quantity,
                             recipientName: recipientName,
                             shipAddress: shipAddress,
                             zipCode: normalizePostalCode(zipCode),
                             phoneNumber: normalizePhoneNumber(phoneNumber),
                             weight: weight,
-                            orderId: `${orderId}:${orderItemId}:${quantity}`
+                            orderId: fields[0] // order-id
                         });
                     }
                 }
@@ -708,12 +710,20 @@
                 dynamicTyping: false
             });
             
+            // 楽天データ処理（初期の方式に戻す）
+            const rakutenParsed = Papa.parse(rakutenData, { 
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: false  // 文字列として保持
+            });
+            
             rakutenParsed.data.forEach(row => {
                 const orderId = row['注文番号'];
                 const itemId = row['商品管理番号'] || row['商品ID'];
                 const itemName = row['商品名'];
                 const quantity = parseInt(row['個数']) || 1;
                 
+                // 送付先情報（正確なフィールド名で取得）
                 const shipName = (row['送付先姓'] || '') + ' ' + (row['送付先名'] || '');
                 const shipZip1 = row['送付先郵便番号1'];
                 const shipZip2 = row['送付先郵便番号2'];
@@ -729,37 +739,28 @@
                     const fullAddress = `${shipPref}${shipCity || ''}${shipAddr || ''}`;
                     const phoneNumber = normalizePhoneNumber((shipPhone1 || '') + (shipPhone2 || '') + (shipPhone3 || ''));
                     
-                    console.log(`楽天商品検索: ${itemId}`);
-                    
-                    // 商品マスタから情報取得
-                    const masterInfo = productMasterData[itemId];
-                    let weight = 50; // デフォルト値
-                    let productDetail = itemName || '';
-
+                    // 商品マスタから重量取得（初期の方式）
+                    let weight = 50; // デフォルト
+                    const masterInfo = productMaster[itemId];
                     if (masterInfo) {
-                        console.log(`楽天商品マスタ発見: ${itemId} (行${masterInfo.rowIndex}) - サイト:${masterInfo.site}`);
-                        
-                        // 楽天商品またはサイト情報が空の場合も受け入れる
-                        if (masterInfo.site === '楽天' || masterInfo.site === '' || masterInfo.site.toLowerCase().includes('rakuten')) {
-                            weight = (masterInfo.weight * masterInfo.quantity) * quantity;
-                            productDetail = `${masterInfo.color}: ${masterInfo.weight}g×${masterInfo.quantity}個×${quantity}`;
-                            console.log(`楽天商品マスタ適用: 重量=${weight}g`);
+                        weight = masterInfo.weight * masterInfo.quantity * quantity;
+                    } else if (itemName) {
+                        // 正規表現で重量を抽出
+                        const weightMatch = itemName.match(/(\d+)g/);
+                        if (weightMatch) {
+                            weight = parseInt(weightMatch[1]) * quantity;
                         } else {
-                            console.log(`楽天商品のサイト不一致: ${masterInfo.site}`);
-                            warnings.push(`楽天商品 ${itemId} のサイト情報が一致しません (${masterInfo.site})`);
-                            weight = 50 * quantity;
+                            // 商品名にタイラバが含まれる場合のデフォルト重量
+                            if (itemName.includes('タイラバ') || itemName.includes('メタルジグ')) {
+                                weight = 60 * quantity; // デフォルト60g
+                            }
                         }
-                    } else {
-                        console.log(`楽天商品マスタ未発見: ${itemId}`);
-                        console.log('利用可能な商品No:', Object.keys(productMasterData).filter(key => key.includes(itemId) || itemId.includes(key)));
-                        warnings.push(`楽天商品 ${itemId} が商品マスタに見つかりません`);
-                        weight = 50 * quantity;
                     }
 
                     result.push({
                         source: '楽天',
                         sku: itemId,
-                        productName: productDetail,
+                        productName: itemName,
                         quantity: quantity,
                         recipientName: shipName.trim(),
                         shipAddress: fullAddress,
@@ -814,39 +815,30 @@
             return mergeIdenticalRecipients(result);
         }
 
-        function processYahooItem(itemId, quantity, title, shipName, shipAddress, shipZip, shipPhone, orderId, result) {
+        function processYahooItemSimple(itemId, quantity, title, shipName, shipAddress, shipZip, shipPhone, orderId, result) {
             if (shipName && shipAddress && shipZip) {
-                console.log(`Yahoo商品検索: ${itemId}`);
-                
-                // 商品マスタから情報取得
-                const masterInfo = productMasterData[itemId];
-                let weight = 50; // デフォルト値
-                let productDetail = title || '';
-
+                // 商品マスタから重量取得（初期の方式）
+                let weight = 50; // デフォルト
+                const masterInfo = productMaster[itemId];
                 if (masterInfo) {
-                    console.log(`Yahoo商品マスタ発見: ${itemId} (行${masterInfo.rowIndex}) - サイト:${masterInfo.site}`);
-                    
-                    // Yahoo商品またはサイト情報が空の場合も受け入れる
-                    if (masterInfo.site === 'Yahoo' || masterInfo.site === '' || masterInfo.site === 'Yahoo!') {
-                        weight = (masterInfo.weight * masterInfo.quantity) * quantity;
-                        productDetail = `${masterInfo.color}: ${masterInfo.weight}g×${masterInfo.quantity}個×${quantity}`;
-                        console.log(`Yahoo商品マスタ適用: 重量=${weight}g`);
+                    weight = masterInfo.weight * masterInfo.quantity * quantity;
+                } else if (title) {
+                    // 正規表現で重量を抽出
+                    const weightMatch = title.match(/(\d+)g/);
+                    if (weightMatch) {
+                        weight = parseInt(weightMatch[1]) * quantity;
                     } else {
-                        console.log(`Yahoo商品のサイト不一致: ${masterInfo.site}`);
-                        warnings.push(`Yahoo商品 ${itemId} のサイト情報が一致しません (${masterInfo.site})`);
-                        weight = 50 * quantity;
+                        // タイトルに含まれる数字から推定
+                        if (title.includes('タイラバ') || title.includes('メタルジグ')) {
+                            weight = 60 * quantity; // デフォルト60g
+                        }
                     }
-                } else {
-                    console.log(`Yahoo商品マスタ未発見: ${itemId}`);
-                    console.log('利用可能な商品No:', Object.keys(productMasterData).filter(key => key.includes(itemId) || itemId.includes(key)));
-                    warnings.push(`Yahoo商品 ${itemId} が商品マスタに見つかりません`);
-                    weight = 50 * quantity;
                 }
 
                 result.push({
                     source: 'Yahoo',
                     sku: itemId,
-                    productName: productDetail,
+                    productName: title,
                     quantity: quantity,
                     recipientName: shipName,
                     shipAddress: shipAddress,
@@ -1048,14 +1040,15 @@
 
         // リセット処理
         resetButton.addEventListener('click', () => {
-            // ファイル選択をリセット
+            // リセット処理
             productMasterFile.value = '';
             amazonFile.value = '';
             rakutenFile.value = '';
             yahooFile.value = '';
             
             selectedFiles = { productMaster: null, amazon: null, rakuten: null, yahoo: null };
-            productMasterData = null;
+            // 商品マスタはデフォルトに戻す
+            productMasterData = productMaster;
             warnings = [];
             
             // UI状態をリセット
