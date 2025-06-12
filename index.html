@@ -25,7 +25,7 @@
             border-radius: 12px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             width: 90%;
-            max-width: 700px;
+            max-width: 600px;
             padding: 40px;
         }
 
@@ -230,30 +230,6 @@
         .info-list li {
             margin-bottom: 4px;
         }
-
-        .debug-section {
-            display: none;
-            background: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 16px;
-            margin-top: 20px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .debug-title {
-            font-weight: 600;
-            color: #4a5568;
-            margin-bottom: 8px;
-        }
-
-        .debug-content {
-            font-family: monospace;
-            font-size: 12px;
-            color: #718096;
-            white-space: pre-wrap;
-        }
     </style>
 </head>
 <body>
@@ -264,12 +240,6 @@
         </div>
 
         <div class="upload-section">
-            <div class="file-group">
-                <label class="file-label">商品マスタ (.xlsm形式)</label>
-                <input type="file" id="masterFile" class="file-input" accept=".xlsm,.xlsx">
-                <div class="file-status" id="masterStatus">ファイルを選択してください</div>
-            </div>
-
             <div class="file-group">
                 <label class="file-label">Amazonデータ (TSV形式)</label>
                 <input type="file" id="amazonFile" class="file-input" accept=".txt,.tsv,.csv">
@@ -286,6 +256,12 @@
                 <label class="file-label">Yahooデータ (CSV形式)</label>
                 <input type="file" id="yahooFile" class="file-input" accept=".csv">
                 <div class="file-status" id="yahooStatus">ファイルを選択してください</div>
+            </div>
+
+            <div class="file-group">
+                <label class="file-label">商品マスタ (Excel形式) - 必須</label>
+                <input type="file" id="masterFile" class="file-input" accept=".xlsx,.xls">
+                <div class="file-status" id="masterStatus">ファイルを選択してください</div>
             </div>
         </div>
 
@@ -313,28 +289,32 @@
         <div class="info-section">
             <div class="info-title">使用方法</div>
             <ul class="info-list">
-                <li>1. 商品マスタファイル（Excel形式）を選択</li>
-                <li>2. 各ECサイトのCSVファイルを選択</li>
+                <li>1. 各ECサイトのCSVファイルを選択</li>
+                <li>2. 商品マスタファイルを選択（必須）</li>
                 <li>3. 「データを変換してダウンロード」をクリック</li>
                 <li>4. 変換完了後、ヤマト運輸用CSVをダウンロード</li>
                 <li>※ ファイル形式：Amazon(TSV)、楽天・Yahoo(CSV)</li>
             </ul>
-        </div>
-
-        <div class="debug-section" id="debugSection">
-            <div class="debug-title">デバッグ情報</div>
-            <div class="debug-content" id="debugContent"></div>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
+        // グローバル変数
+        let productMaster = {};
+        let selectedFiles = {
+            amazon: null,
+            rakuten: null,
+            yahoo: null,
+            master: null
+        };
+
         // DOM要素
-        const masterFile = document.getElementById('masterFile');
         const amazonFile = document.getElementById('amazonFile');
         const rakutenFile = document.getElementById('rakutenFile');
         const yahooFile = document.getElementById('yahooFile');
+        const masterFile = document.getElementById('masterFile');
         const convertButton = document.getElementById('convertButton');
         const progressSection = document.getElementById('progressSection');
         const progressFill = document.getElementById('progressFill');
@@ -343,32 +323,12 @@
         const messageArea = document.getElementById('messageArea');
         const downloadButton = document.getElementById('downloadButton');
         const resetButton = document.getElementById('resetButton');
-        const debugSection = document.getElementById('debugSection');
-        const debugContent = document.getElementById('debugContent');
-
-        // ファイル選択状態管理
-        let selectedFiles = {
-            master: null,
-            amazon: null,
-            rakuten: null,
-            yahoo: null
-        };
-
-        // 商品マスタデータ
-        let productMaster = new Map();
-
-        // デバッグログ
-        function debugLog(message) {
-            console.log(message);
-            debugContent.textContent += message + '\n';
-            debugSection.style.display = 'block';
-        }
 
         // ファイル選択イベント
-        masterFile.addEventListener('change', (e) => handleFileSelect(e, 'master', 'masterStatus'));
         amazonFile.addEventListener('change', (e) => handleFileSelect(e, 'amazon', 'amazonStatus'));
         rakutenFile.addEventListener('change', (e) => handleFileSelect(e, 'rakuten', 'rakutenStatus'));
         yahooFile.addEventListener('change', (e) => handleFileSelect(e, 'yahoo', 'yahooStatus'));
+        masterFile.addEventListener('change', (e) => handleFileSelect(e, 'master', 'masterStatus'));
 
         function handleFileSelect(event, type, statusId) {
             const file = event.target.files[0];
@@ -391,139 +351,117 @@
         }
 
         function updateConvertButton() {
-            const allFilesSelected = selectedFiles.master && selectedFiles.amazon && selectedFiles.rakuten && selectedFiles.yahoo;
+            const allFilesSelected = selectedFiles.amazon && selectedFiles.rakuten && selectedFiles.yahoo && selectedFiles.master;
             convertButton.disabled = !allFilesSelected;
         }
 
         // 変換処理
         convertButton.addEventListener('click', async () => {
             try {
-                debugContent.textContent = '';
                 showProgress();
                 updateProgress(5, '商品マスタを読み込み中...');
 
                 // 商品マスタ読み込み
-                await loadProductMaster();
-                updateProgress(15, 'Amazonデータを読み込み中...');
+                await loadProductMaster(selectedFiles.master);
+                updateProgress(15, 'ファイルを読み込み中...');
 
                 // ファイル読み込み
                 const amazonData = await readFile(selectedFiles.amazon, 'auto');
-                updateProgress(25, '楽天データを読み込み中...');
+                updateProgress(25, 'Amazonデータを解析中...');
                 
                 const rakutenData = await readFile(selectedFiles.rakuten, 'auto');
-                updateProgress(35, 'Yahooデータを読み込み中...');
+                updateProgress(40, '楽天データを解析中...');
                 
                 const yahooData = await readFile(selectedFiles.yahoo, 'auto');
-                updateProgress(50, 'データを変換中...');
+                updateProgress(55, 'Yahooデータを解析中...');
 
                 // データ変換
+                updateProgress(70, 'データを統合中...');
                 const convertedData = await convertToYamatoFormat(amazonData, rakutenData, yahooData);
-                updateProgress(80, 'データを統合中...');
                 
-                // 同一人物のデータを統合
-                const mergedData = mergeDataByRecipient(convertedData);
                 updateProgress(90, 'CSV生成中...');
+                const csvContent = generateYamatoCSV(convertedData);
                 
-                const csvContent = generateYamatoCSV(mergedData);
                 updateProgress(100, '変換完了!');
                 
                 setTimeout(() => {
-                    showResult(csvContent, mergedData.length);
+                    showResult(csvContent, convertedData.length);
                 }, 500);
 
             } catch (error) {
                 console.error('変換エラー:', error);
-                debugLog('エラー詳細: ' + error.message);
                 showError(error.message);
             }
         });
 
         // 商品マスタ読み込み
-        async function loadProductMaster() {
-            const buffer = await readFileAsArrayBuffer(selectedFiles.master);
-            const workbook = XLSX.read(buffer, {
-                cellStyles: true,
-                cellFormulas: true,
-                cellDates: true
-            });
-
-            const masterSheetName = workbook.SheetNames.find(name => 
-                name.includes('商品') || name.includes('マスタ')
-            ) || workbook.SheetNames[0];
-
-            debugLog(`商品マスタシート名: ${masterSheetName}`);
-
-            const masterSheet = workbook.Sheets[masterSheetName];
-            const masterData = XLSX.utils.sheet_to_json(masterSheet, { 
-                header: 1,
-                defval: "",
-                raw: false 
-            });
-
-            debugLog(`商品マスタ行数: ${masterData.length}`);
-
-            // 商品マスタを処理
-            productMaster.clear();
-            let validCount = 0;
-
-            for (let i = 1; i < masterData.length; i++) {
-                const row = masterData[i];
-                
-                if (row[0] && row[1] && row[2]) {
-                    const site = row[0].trim();
-                    const detail = row[1].trim();
-                    const productNo = row[2].toString().trim();
-                    
-                    // 複数バリエーションの処理
-                    const variations = [];
-                    for (let j = 3; j < row.length; j += 3) {
-                        const weight = row[j];
-                        const qty = row[j + 1];
-                        const color = row[j + 2];
-                        
-                        if (weight && qty && color) {
-                            variations.push({
-                                weight: parseFloat(weight) || 0,
-                                quantity: parseInt(qty) || 0,
-                                color: color.toString().trim()
-                            });
-                        }
-                    }
-                    
-                    if (variations.length === 0) {
-                        variations.push({
-                            weight: 50,
-                            quantity: 1,
-                            color: "金"
-                        });
-                    }
-                    
-                    productMaster.set(`${site}:${productNo}`, {
-                        site: site,
-                        detail: detail,
-                        productNo: productNo,
-                        variations: variations
-                    });
-                    
-                    validCount++;
-                }
-            }
-
-            debugLog(`有効な商品データ: ${validCount}件`);
-            
-            // サイト別集計
-            const siteCounts = {};
-            for (const [key, product] of productMaster) {
-                siteCounts[product.site] = (siteCounts[product.site] || 0) + 1;
-            }
-            debugLog(`サイト別商品数: ${JSON.stringify(siteCounts)}`);
-        }
-
-        // ファイル読み込み関数
-        async function readFileAsArrayBuffer(file) {
+        async function loadProductMaster(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target.result);
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        
+                        // 商品マスタシートを検索
+                        let sheetName = null;
+                        for (const name of workbook.SheetNames) {
+                            if (name.includes('商品') || name.includes('マスタ') || name.includes('master')) {
+                                sheetName = name;
+                                break;
+                            }
+                        }
+                        
+                        if (!sheetName) {
+                            sheetName = workbook.SheetNames[0]; // 最初のシートを使用
+                        }
+                        
+                        const worksheet = workbook.Sheets[sheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        
+                        // ヘッダー行を取得
+                        const headers = jsonData[0];
+                        console.log('商品マスタヘッダー:', headers);
+                        
+                        // 商品マスタをオブジェクトに変換
+                        productMaster = {};
+                        for (let i = 1; i < jsonData.length; i++) {
+                            const row = jsonData[i];
+                            if (!row || row.length === 0) continue;
+                            
+                            const item = {};
+                            headers.forEach((header, index) => {
+                                if (header && row[index] !== undefined) {
+                                    item[header] = row[index];
+                                }
+                            });
+                            
+                            // 商品Noをキーとして保存（複数の販売サイトに対応）
+                            const productNo = item['商品No'] || item['商品番号'] || item['SKU'];
+                            const site = item['販売サイト'] || item['サイト'];
+                            
+                            if (productNo) {
+                                const key = site ? `${site}_${productNo}` : productNo;
+                                productMaster[key] = {
+                                    site: site,
+                                    detail: item['商品詳細'] || item['商品名'] || '',
+                                    weight: parseFloat(item['重さ'] || item['重量'] || 0),
+                                    quantity: parseInt(item['個数'] || item['数量'] || 1),
+                                    color: item['色'] || item['カラー'] || ''
+                                };
+                                
+                                // サイト情報なしでも登録（後方互換性）
+                                productMaster[productNo] = productMaster[key];
+                            }
+                        }
+                        
+                        console.log('商品マスタ読み込み完了:', Object.keys(productMaster).length, '件');
+                        resolve();
+                    } catch (error) {
+                        console.error('商品マスタ読み込みエラー:', error);
+                        reject(new Error('商品マスタファイルの読み込みに失敗しました'));
+                    }
+                };
                 reader.onerror = reject;
                 reader.readAsArrayBuffer(file);
             });
@@ -536,8 +474,7 @@
                     try {
                         const buffer = new Uint8Array(e.target.result);
                         
-                        // 複数のエンコードを試行
-                        const encodings = ['utf-8', 'shift-jis', 'euc-jp'];
+                        const encodings = ['utf-8', 'shift-jis', 'euc-jp', 'iso-2022-jp'];
                         let bestResult = null;
                         let bestScore = 0;
                         
@@ -546,7 +483,6 @@
                                 const decoder = new TextDecoder(enc, { fatal: false });
                                 const text = decoder.decode(buffer);
                                 
-                                // 日本語文字の含有率でスコア計算
                                 const japaneseScore = calculateJapaneseScore(text);
                                 
                                 if (japaneseScore > bestScore) {
@@ -554,19 +490,19 @@
                                     bestResult = text;
                                 }
                             } catch (error) {
-                                continue;
+                                console.log(`Encoding ${enc} failed:`, error.message);
                             }
                         }
                         
                         if (bestResult) {
                             resolve(bestResult);
                         } else {
-                            // 最後の手段：UTF-8で強制デコード
                             const decoder = new TextDecoder('utf-8', { fatal: false });
                             resolve(decoder.decode(buffer));
                         }
                         
                     } catch (error) {
+                        console.error('All decoding attempts failed:', error);
                         reject(error);
                     }
                 };
@@ -590,457 +526,219 @@
             return Math.max(0, score);
         }
 
-        // 商品マスタ検索関数
-        function findProductInMaster(site, productId) {
-            // 直接検索
-            let product = productMaster.get(`${site}:${productId}`);
-            if (product) return product;
-            
-            // Yahoo の場合の特別処理
-            if (site === 'Yahoo') {
-                // L1=608 形式の処理
-                const match1 = productId.match(/L1=([^&]+)/);
-                if (match1) {
-                    product = productMaster.get(`${site}:${match1[1]}`);
-                    if (product) return product;
-                }
-                
-                // L1=bara60&L2=bara80 形式の処理
-                const matches = productId.match(/L\d+=([^&]+)/g);
-                if (matches) {
-                    for (const match of matches) {
-                        const value = match.split('=')[1];
-                        product = productMaster.get(`${site}:${value}`);
-                        if (product) return product;
-                    }
-                }
-            }
-            
-            return null;
-        }
-
-        // データ変換メイン関数
         async function convertToYamatoFormat(amazonData, rakutenData, yahooData) {
             const result = [];
+            const customerMap = new Map(); // 同一顧客判定用
 
             // Amazonデータ処理
-            debugLog('Amazonデータ処理開始');
             const amazonLines = amazonData.split('\n').filter(line => line.trim());
-            if (amazonLines.length > 0) {
-                const amazonHeaders = amazonLines[0].split('\t');
-                debugLog(`Amazon列数: ${amazonHeaders.length}`);
+            const amazonHeaders = amazonLines[0].split('\t');
+            
+            for (let i = 1; i < amazonLines.length; i++) {
+                const fields = amazonLines[i].split('\t');
+                if (fields.length < amazonHeaders.length) continue;
+
+                const sku = fields[11]; // sku
+                const productName = fields[13]; // product-name
+                const quantity = parseInt(fields[14]) || 1; // quantity-purchased
+                const recipientName = fields[19]; // recipient-name
+                const shipAddress = fields[20]; // ship-address-1
+                const zipCode = fields[25]; // ship-postal-code
+                const phoneNumber = fields[10]; // buyer-phone-number
+                const orderId = fields[0]; // order-id
+                const orderItemId = fields[1]; // order-item-id
+
+                // 商品マスタから情報取得
+                const masterKey = `Amazon_${sku}`;
+                const masterInfo = productMaster[masterKey] || productMaster[sku];
                 
-                for (let i = 1; i < amazonLines.length; i++) {
-                    const fields = amazonLines[i].split('\t');
-                    if (fields.length < amazonHeaders.length) continue;
+                let weight, itemDescription;
+                if (masterInfo) {
+                    weight = masterInfo.weight * quantity;
+                    itemDescription = `${masterInfo.color}: ${masterInfo.weight}g×${quantity}`;
+                } else {
+                    // 商品名から重量を推定
+                    const weightMatch = productName.match(/(\d+)g/);
+                    weight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
+                    itemDescription = productName ? productName.substring(0, 50) : '商品名確認要';
+                }
 
-                    const orderId = fields[0]; // order-id
-                    const orderItemId = fields[1]; // order-item-id
-                    const sku = fields[11]; // sku
-                    const productName = fields[13]; // product-name
-                    const quantity = parseInt(fields[14]) || 1; // quantity-purchased
-                    const recipientName = cleanText(fields[19]); // recipient-name
-                    const shipAddress = cleanText(fields[20]); // ship-address-1
-                    const zipCode = fields[25]; // ship-postal-code
-                    const phoneNumber = fields[10]; // buyer-phone-number
-
-                    // 商品マスタから情報取得
-                    const masterInfo = findProductInMaster('Amazon', sku);
-                    let weight = 50; // デフォルト
-                    let productDetail = '商品';
-                    let color = '金';
-
-                    if (masterInfo && masterInfo.variations.length > 0) {
-                        const variation = masterInfo.variations[0];
-                        weight = variation.weight * quantity;
-                        color = variation.color;
-                        productDetail = `${color}: ${variation.weight}gx${quantity}`;
-                    }
-
-                    if (recipientName && shipAddress && zipCode) {
-                        const salesId = `${orderId}:${orderItemId}:${quantity}`;
-                        
-                        result.push({
+                if (recipientName && shipAddress && zipCode) {
+                    const customerKey = `${recipientName}_${shipAddress}_${phoneNumber}`;
+                    const salesId = `${orderId}:${orderItemId}:${quantity}`;
+                    
+                    if (customerMap.has(customerKey)) {
+                        // 同一顧客の場合は統合
+                        const existing = customerMap.get(customerKey);
+                        existing.weight += weight;
+                        existing.salesIds.push(salesId);
+                    } else {
+                        customerMap.set(customerKey, {
                             source: 'Amazon',
-                            sku: sku,
-                            productName: productName,
-                            quantity: quantity,
                             recipientName: recipientName,
                             shipAddress: shipAddress,
-                            zipCode: normalizeZipCode(zipCode),
-                            phoneNumber: normalizePhoneNumber(phoneNumber),
+                            zipCode: zipCode.replace(/-/g, '').padStart(7, '0'),
+                            phoneNumber: phoneNumber.startsWith('0') ? phoneNumber : '0' + phoneNumber,
                             weight: weight,
-                            salesId: salesId,
-                            productDetail: productDetail,
-                            color: color
+                            itemDescription: itemDescription,
+                            salesIds: [salesId]
                         });
                     }
                 }
             }
 
             // 楽天データ処理
-            debugLog('楽天データ処理開始');
             const rakutenParsed = Papa.parse(rakutenData, { 
                 header: true,
                 skipEmptyLines: true,
                 dynamicTyping: false
             });
             
-            debugLog(`楽天データ行数: ${rakutenParsed.data.length}`);
-            
-            if (rakutenParsed.data.length > 0) {
-                const sampleRow = rakutenParsed.data[0];
-                const allKeys = Object.keys(sampleRow);
-                debugLog(`楽天全列名 (${allKeys.length}個): ${allKeys.slice(0, 10).join(', ')}...`);
+            rakutenParsed.data.forEach(row => {
+                const orderId = row['注文番号'];
+                const itemId = row['商品管理番号'];
+                const itemName = row['商品名'];
+                const quantity = parseInt(row['個数']) || 1;
                 
-                // より柔軟な列名検索
-                const findField = (patterns) => {
-                    for (const pattern of patterns) {
-                        const found = allKeys.find(key => 
-                            key.toLowerCase().includes(pattern.toLowerCase()) ||
-                            key.includes(pattern)
-                        );
-                        if (found) return found;
+                // 送付先情報
+                const shipName = (row['送付先姓'] || '') + ' ' + (row['送付先名'] || '');
+                const shipZip1 = row['送付先郵便番号1'];
+                const shipZip2 = row['送付先郵便番号2'];
+                const shipPref = row['送付先住所都道府県'];
+                const shipCity = row['送付先住所郡市区'];
+                const shipAddr = row['送付先住所それ以降の住所'];
+                const shipPhone1 = row['送付先電話番号1'];
+                const shipPhone2 = row['送付先電話番号2'];
+                const shipPhone3 = row['送付先電話番号3'];
+
+                if (shipName.trim() && shipZip1 && shipPref) {
+                    const zipCode = (shipZip1 + (shipZip2 || '')).replace(/-/g, '').padStart(7, '0');
+                    const fullAddress = `${shipPref}${shipCity || ''}${shipAddr || ''}`;
+                    const phoneNumber = `${shipPhone1 || ''}-${shipPhone2 || ''}-${shipPhone3 || ''}`;
+                    
+                    // 商品マスタから情報取得
+                    const masterKey = `楽天_${itemId}`;
+                    const masterInfo = productMaster[masterKey] || productMaster[itemId];
+                    
+                    let weight, itemDescription;
+                    if (masterInfo) {
+                        weight = masterInfo.weight * quantity;
+                        itemDescription = `${masterInfo.color}: ${masterInfo.weight}g×${quantity}`;
+                    } else {
+                        const weightMatch = itemName ? itemName.match(/(\d+)g/) : null;
+                        weight = weightMatch ? parseInt(weightMatch[1]) * quantity : 60 * quantity;
+                        itemDescription = itemName ? itemName.substring(0, 50) : '商品名確認要';
                     }
-                    return null;
-                };
-                
-                // 必要な列名を検索
-                const orderIdField = findField(['注文番号', 'Order', '注文', '番号']) || allKeys[0];
-                const productIdField = findField(['商品管理番号', '商品ID', 'Product', '管理番号']);
-                const productNameField = findField(['商品名', 'Title', 'Product']);
-                const quantityField = findField(['個数', '数量', 'Quantity']);
-                
-                // 配送先情報
-                const shipNameField = findField(['送付先名前', '送付先氏名', '配送先名', 'Ship']);
-                const shipLastNameField = findField(['送付先姓', '送付先Last']);
-                const shipFirstNameField = findField(['送付先名', '送付先First']);
-                const shipZip1Field = findField(['送付先郵便番号1', '郵便番号1', 'Zip1']);
-                const shipZip2Field = findField(['送付先郵便番号2', '郵便番号2', 'Zip2']);
-                const shipPrefField = findField(['送付先住所都道府県', '都道府県', 'Prefecture']);
-                const shipCityField = findField(['送付先住所郡市区', '市区町村', 'City']);
-                const shipAddrField = findField(['送付先住所それ以降', '番地', 'Address']);
-                const shipPhoneField = findField(['送付先電話番号1', '電話番号', 'Phone']);
-                
-                debugLog(`検出された列名:`);
-                debugLog(`注文番号: ${orderIdField}`);
-                debugLog(`商品管理番号: ${productIdField}`);
-                debugLog(`商品名: ${productNameField}`);
-                debugLog(`個数: ${quantityField}`);
-                debugLog(`送付先姓: ${shipLastNameField}`);
-                debugLog(`送付先名: ${shipFirstNameField}`);
-                
-                rakutenParsed.data.forEach((row, index) => {
-                    try {
-                        const orderId = row[orderIdField];
-                        const productId = row[productIdField];
-                        const productName = row[productNameField];
-                        const quantity = parseInt(row[quantityField]) || 1;
-                        
-                        // 送付先名前を姓+名で結合
-                        const shipLastName = cleanText(row[shipLastNameField] || '');
-                        const shipFirstName = cleanText(row[shipFirstNameField] || '');
-                        const shipName = (shipLastName + ' ' + shipFirstName).trim();
-                        
-                        const shipZip1 = row[shipZip1Field];
-                        const shipZip2 = row[shipZip2Field];
-                        const shipPref = row[shipPrefField];
-                        const shipCity = row[shipCityField];
-                        const shipAddr = row[shipAddrField];
-                        const shipPhone1 = row[shipPhoneField];
-                        const shipPhone2 = row[findField(['送付先電話番号2'])];
-                        const shipPhone3 = row[findField(['送付先電話番号3'])];
-                        
-                        // 電話番号を結合
-                        const shipPhone = `${shipPhone1 || ''}-${shipPhone2 || ''}-${shipPhone3 || ''}`.replace(/^-+|-+$/g, '');
 
-                        debugLog(`楽天行${index + 1}: 注文=${orderId}, 商品=${productId}, 名前=${shipName}`);
-
-                        if (shipName && orderId && productId) {
-                            const zipCode = normalizeZipCode((shipZip1 || '') + (shipZip2 || ''));
-                            const fullAddress = `${shipPref || ''}${shipCity || ''}${shipAddr || ''}`;
-                            
-                            // 商品マスタから情報取得
-                            const masterInfo = findProductInMaster('楽天', productId);
-                            let weight = 60; // 楽天のデフォルト重量を調整
-                            let productDetail = '商品';
-                            let color = '銀';
-
-                            if (masterInfo && masterInfo.variations.length > 0) {
-                                const variation = masterInfo.variations[0];
-                                weight = variation.weight * quantity;
-                                color = variation.color;
-                                productDetail = `${color}: ${variation.weight}gx${quantity}`;
-                                debugLog(`商品マスタ発見: ${productId} -> ${productDetail}`);
-                            } else {
-                                // 商品マスタに見つからない場合は商品名から推定
-                                debugLog(`商品マスタ未発見: ${productId}, 商品名から推定`);
-                                if (productName) {
-                                    // 商品名から重量を抽出
-                                    const weightMatches = productName.match(/(\d+)g/g);
-                                    if (weightMatches) {
-                                        const weights = weightMatches.map(w => parseInt(w));
-                                        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-                                        weight = totalWeight * quantity;
-                                        productDetail = `${color}: ${Math.round(totalWeight / weights.length)}gx${quantity}`;
-                                        debugLog(`商品名から重量推定: ${totalWeight}g`);
-                                    } else {
-                                        // セット商品の場合のデフォルト重量
-                                        if (productName.includes('セット') || productName.includes('4個')) {
-                                            weight = 240 * quantity; // 4個セットの推定重量
-                                            productDetail = `${color}: 60gx${4 * quantity}`;
-                                        } else {
-                                            weight = 60 * quantity;
-                                            productDetail = `${color}: 60gx${quantity}`;
-                                        }
-                                    }
-                                }
-                            }
-
-                            result.push({
-                                source: '楽天',
-                                sku: productId,
-                                productName: productName,
-                                quantity: quantity,
-                                recipientName: shipName,
-                                shipAddress: fullAddress,
-                                zipCode: zipCode,
-                                phoneNumber: normalizePhoneNumber(shipPhone),
-                                weight: weight,
-                                salesId: orderId,
-                                productDetail: productDetail,
-                                color: color
-                            });
-                            
-                            debugLog(`楽天データ追加成功: ${shipName} (${weight}g)`);
-                        } else {
-                            debugLog(`楽天行${index + 1}スキップ: 必須データ不足`);
-                        }
-                    } catch (error) {
-                        debugLog(`楽天行${index + 1}処理エラー: ${error.message}`);
+                    const customerKey = `${shipName.trim()}_${fullAddress}_${phoneNumber}`;
+                    
+                    if (customerMap.has(customerKey)) {
+                        const existing = customerMap.get(customerKey);
+                        existing.weight += weight;
+                        existing.salesIds.push(orderId);
+                    } else {
+                        customerMap.set(customerKey, {
+                            source: '楽天',
+                            recipientName: shipName.trim(),
+                            shipAddress: fullAddress,
+                            zipCode: zipCode,
+                            phoneNumber: phoneNumber,
+                            weight: weight,
+                            itemDescription: itemDescription,
+                            salesIds: [orderId]
+                        });
                     }
-                });
-            }
+                }
+            });
 
             // Yahooデータ処理
-            debugLog('Yahooデータ処理開始');
             const yahooParsed = Papa.parse(yahooData, { 
                 header: true,
                 skipEmptyLines: true,
                 dynamicTyping: false
             });
             
-            debugLog(`Yahoo データ行数: ${yahooParsed.data.length}`);
-            
             yahooParsed.data.forEach(row => {
                 const orderId = row['OrderId'];
                 const itemId = row['ItemId'];
                 const title = row['Title'];
-                const quantity = parseInt(row['QuantityDetail']) || 1;
-                const shipName = cleanText(row['ShipName']);
-                const shipAddress = row['ShipAddress1'];
+                const subCode = row['SubCode'];
+                const quantityDetail = row['QuantityDetail'];
+                const shipName = row['ShipName'];
+                const shipAddress = row['ShipAddressFull'];
                 const shipZip = row['ShipZipCode'];
                 const shipPhone = row['ShipPhoneNumber'];
 
-                if (shipName && shipAddress && shipZip && itemId) {
-                    // Yahoo の商品ID処理
-                    const masterInfo = findProductInMaster('Yahoo', itemId);
-                    let weight = 50; // デフォルト
-                    let productDetail = '商品';
-                    let color = '金';
-
-                    if (masterInfo && masterInfo.variations.length > 0) {
-                        const variation = masterInfo.variations[0];
-                        weight = variation.weight * quantity;
-                        color = variation.color;
-                        productDetail = `${color}: ${variation.weight}gx${quantity}`;
+                if (shipName && shipAddress && shipZip) {
+                    // Yahoo複数商品対応
+                    const items = [];
+                    if (itemId && itemId.includes('&')) {
+                        // 複数商品の場合
+                        const itemParts = itemId.split('&');
+                        itemParts.forEach(part => {
+                            const match = part.match(/(.+)=(.+)/);
+                            if (match) {
+                                const productNo = match[2];
+                                items.push({ productNo, quantity: 1 });
+                            }
+                        });
+                    } else {
+                        // 単一商品の場合
+                        const productNo = subCode || itemId;
+                        const quantity = parseInt(quantityDetail) || 1;
+                        items.push({ productNo, quantity });
                     }
 
-                    result.push({
-                        source: 'Yahoo',
-                        sku: itemId,
-                        productName: title,
-                        quantity: quantity,
-                        recipientName: shipName,
-                        shipAddress: shipAddress,
-                        zipCode: normalizeZipCode(shipZip),
-                        phoneNumber: normalizePhoneNumber(shipPhone),
-                        weight: weight,
-                        salesId: orderId,
-                        productDetail: productDetail,
-                        color: color
+                    items.forEach(item => {
+                        // 商品マスタから情報取得
+                        const masterKey = `Yahoo_${item.productNo}`;
+                        const masterInfo = productMaster[masterKey] || productMaster[item.productNo];
+                        
+                        let weight, itemDescription;
+                        if (masterInfo) {
+                            weight = masterInfo.weight * item.quantity;
+                            itemDescription = `${masterInfo.color}: ${masterInfo.weight}g×${item.quantity}`;
+                        } else {
+                            const weightMatch = title ? title.match(/(\d+)g/) : null;
+                            weight = weightMatch ? parseInt(weightMatch[1]) * item.quantity : 60 * item.quantity;
+                            itemDescription = title ? title.substring(0, 50) : '商品名確認要';
+                        }
+
+                        const customerKey = `${shipName}_${shipAddress}_${shipPhone}`;
+                        
+                        if (customerMap.has(customerKey)) {
+                            const existing = customerMap.get(customerKey);
+                            existing.weight += weight;
+                            existing.salesIds.push(orderId);
+                        } else {
+                            customerMap.set(customerKey, {
+                                source: 'Yahoo',
+                                recipientName: shipName,
+                                shipAddress: shipAddress,
+                                zipCode: String(shipZip).replace(/-/g, '').padStart(7, '0'),
+                                phoneNumber: shipPhone,
+                                weight: weight,
+                                itemDescription: itemDescription,
+                                salesIds: [orderId]
+                            });
+                        }
                     });
                 }
             });
 
-            debugLog(`変換済みデータ件数: ${result.length}`);
+            // 統合されたデータをresultに変換
+            customerMap.forEach(customer => {
+                result.push({
+                    ...customer,
+                    salesId: customer.salesIds.join(',')
+                });
+            });
+
             return result;
         }
 
-        // データ統合（同一人物をまとめる）
-        function mergeDataByRecipient(data) {
-            const mergedMap = new Map();
-            
-            data.forEach(item => {
-                // 同一人物判定のキー（名前・住所・電話番号）
-                const key = `${item.recipientName}:${item.shipAddress}:${item.phoneNumber}`;
-                
-                if (mergedMap.has(key)) {
-                    const existing = mergedMap.get(key);
-                    // 重量を合計
-                    existing.weight += item.weight;
-                    // 販売IDを追加
-                    existing.salesId += ',' + item.salesId;
-                    // 商品詳細を統合
-                    if (!existing.productDetail.includes(item.productDetail)) {
-                        existing.productDetail += ', ' + item.productDetail;
-                    }
-                } else {
-                    mergedMap.set(key, { ...item });
-                }
-            });
-            
-            debugLog(`統合後データ件数: ${mergedMap.size}`);
-            return Array.from(mergedMap.values());
-        }
-
-        // テキスト清掃関数
-        function cleanText(text) {
-            if (!text) return '';
-            
-            // 文字化け修復とクリーニング
-            return String(text)
-                .replace(/[\uFFFD�]/g, '') // 置換文字を除去
-                .replace(/[^\x00-\x7F\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\s\-0-9]/g, '') // 日本語と英数字以外を除去
-                .trim();
-        }
-
-        // 郵便番号正規化
-        function normalizeZipCode(zipCode) {
-            if (!zipCode) return '';
-            const cleaned = String(zipCode).replace(/[-\s]/g, '');
-            // 7桁未満の場合は先頭に0を追加
-            return cleaned.padStart(7, '0');
-        }
-
-        // 電話番号正規化
-        function normalizePhoneNumber(phoneNumber) {
-            if (!phoneNumber) return '';
-            const cleaned = String(phoneNumber).replace(/[-\s]/g, '');
-            // 先頭が0でない場合は0を追加
-            return cleaned.startsWith('0') ? cleaned : '0' + cleaned;
-        }
-
-        // ヤマト運輸CSV生成
         function generateYamatoCSV(data) {
-            // 出力データサンプルと同じヘッダー
-            const headers = [
-                '送り状種類半角数字1文字 0 : 発払い 2 : コレクト 3 : クロネコゆうメール 4 : タイム 5 : 着払い 6 : 発払い（複数口） 7 : ネコポス・クロネコゆうパケット 8 : 宅急便コンパクト 9 : 宅急便コンパクトコレクト(※宅急便_必須項目)(※クロネコゆうメール_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                '出荷予定日半角10文字｢YYYY/MM/DD｣で入力してください。(※宅急便_必須項目)(※クロネコゆうメール_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                'お届け予定日半角10文字｢YYYY/MM/DD｣で入力してください。※入力なしの場合、印字されません。※「最短日」と入力可',
-                '配達時間帯半角4文字発払・コレクト・着払・宅急便コンパクト・宅急便コンパクトコレクト・発払（複数口）　の場合 空白 : 指定なし 0812 : 午前中 1416 : 14～16時 1618 : 16～18時 1820 : 18～20時 1921 : 19～21時タイム 0010 : 午前10時まで 0017 : 午後5時まで',
-                'お届け先電話番号半角数字15文字ハイフン含む(※宅急便_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                'お届け先郵便番号半角数字8文字ハイフンなし7文字も可(※宅急便_必須項目)(※クロネコゆうメール_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                'お届け先住所全角/半角都道府県（４文字）市区郡町村（１２文字）町・番地（１６文字）(※宅急便_必須項目)(※クロネコゆうメール_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                'お届け先アパートマンション名全角/半角 16文字/32文字 ',
-                'お届け先名全角/半角16文字/32文字 (※宅急便_必須項目)(※クロネコゆうメール_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                'ご依頼主電話番号半角数字15文字ハイフン含む(※宅急便_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                'ご依頼主郵便番号半角数字8文字ハイフンなし半角7文字も可 (※宅急便_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                'ご依頼主住所全角/半角32文字/64文字都道府県（４文字）市区郡町村（１２文字）町・番地（１６文字）(※宅急便_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                'ご依頼主名全角/半角 16文字/32文字 (※宅急便_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                '品名１全角/半角 25文字/50文字 (※宅急便_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                '総重量(g)',
-                '品名詳細',
-                '不明品名',
-                '販売ID',
-                '',
-                ''
-            ];
-
-            const rows = [headers.join(',')];
-            
-            // 現在の日付（出荷予定日）
-            const today = new Date();
-            const shipDate = `${today.getFullYear()}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getDate().toString().padStart(2, '0')}`;
-
-            data.forEach(item => {
-                // 改良されたCSVエスケープ処理
-                const escapeCSV = (str) => {
-                    if (!str) return '';
-                    let strValue = String(str).trim();
-                    
-                    // カンマ、ダブルクォート、改行が含まれる場合は必ずクォートで囲む
-                    if (strValue.includes(',') || strValue.includes('"') || strValue.includes('\n') || strValue.includes('\r')) {
-                        // 内部のダブルクォートを二重にエスケープ
-                        strValue = strValue.replace(/"/g, '""');
-                        return `"${strValue}"`;
-                    }
-                    return strValue;
-                };
-                
-                // 店舗名の決定
-                let storeName = 'JGSフィッシュ';
-                if (item.source === '楽天') {
-                    storeName = 'JGSフィッシュ (楽天市場店)';
-                } else if (item.source === 'Amazon') {
-                    storeName = 'JGSフィッシュ (Amazon店)';
-                } else if (item.source === 'Yahoo') {
-                    storeName = 'JGSフィッシュ (yahoo!ショッピング店)';
-                }
-                
-                // 品名の制限（50文字まで）
-                let productDetail = item.productDetail || '商品';
-                if (productDetail.length > 50) {
-                    productDetail = productDetail.substring(0, 47) + '...';
-                }
-                
-                const row = [
-                    '7', // ネコポス・クロネコゆうパケット
-                    escapeCSV(shipDate),
-                    '', // お届け予定日（空白）
-                    '', // 配達時間帯（指定なし）
-                    escapeCSV(item.phoneNumber || ''),
-                    escapeCSV(item.zipCode || ''),
-                    escapeCSV(item.shipAddress || ''),
-                    '', // アパートマンション名
-                    escapeCSV(item.recipientName || ''),
-                    '050-3590-1444', // JGSフィッシュ固定値
-                    '104-0061',
-                    '東京都中央区銀座 1-22-11 2F',
-                    escapeCSV(storeName),
-                    escapeCSV(productDetail), // 品名
-                    String(item.weight || 50),
-                    '', // 品名詳細
-                    '', // 不明品名
-                    escapeCSV(item.salesId || ''),
-                    '',
-                    ''
-                ];
-                
-                // 20列ちょうどになるようにする
-                while (row.length < 20) {
-                    row.push('');
-                }
-                if (row.length > 20) {
-                    row.length = 20;
-                }
-                
-                rows.push(row.join(','));
-            });
-
-            debugLog(`CSV生成完了: ${rows.length}行（ヘッダー含む）`);
-            return rows.join('\r\n'); // Windows改行コード
-        } (※宅急便_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                '品名１全角/半角 25文字/50文字 (※宅急便_必須項目)(※ネコポス・クロネコゆうパケット_必須項目)',
-                '総重量(g)',
-                '品名詳細',
-                '不明品名',
-                '販売ID',
-                '',
-                ''
-            ];
-
-            const rows = [headers.join(',')];
+            const rows = [];
             
             // 現在の日付（出荷予定日）
             const today = new Date();
@@ -1056,42 +754,32 @@
                     return strValue;
                 };
                 
-                // 店舗名の決定
-                let storeName = 'JGSフィッシュ';
-                if (item.source === '楽天') {
-                    storeName = 'JGSフィッシュ (楽天市場店)';
-                } else if (item.source === 'Amazon') {
-                    storeName = 'JGSフィッシュ (Amazon店)';
-                } else if (item.source === 'Yahoo') {
-                    storeName = 'JGSフィッシュ (yahoo!ショッピング店)';
-                }
-                
                 const row = [
                     '7', // ネコポス・クロネコゆうパケット
-                    shipDate,
-                    '', // お届け予定日（空白）
-                    '', // 配達時間帯（指定なし）
-                    escapeCSV(item.phoneNumber),
-                    escapeCSV(item.zipCode),
-                    escapeCSV(item.shipAddress),
+                    shipDate, // 出荷予定日
+                    '', // お届け予定日
+                    '', // 配達時間帯
+                    escapeCSV(item.phoneNumber), // お届け先電話番号
+                    escapeCSV(item.zipCode), // お届け先郵便番号
+                    escapeCSV(item.shipAddress), // お届け先住所
                     '', // アパートマンション名
-                    escapeCSV(item.recipientName),
-                    '050-3590-1444', // JGSフィッシュ固定値
-                    '104-0061',
-                    '東京都中央区銀座 1-22-11 2F',
-                    storeName,
-                    escapeCSV(item.productDetail), // 品名
-                    item.weight || 50,
+                    escapeCSV(item.recipientName), // お届け先名
+                    '050-3590-1444', // ご依頼主電話番号
+                    '1040061', // ご依頼主郵便番号
+                    '東京都中央区銀座1-22-11 2F', // ご依頼主住所
+                    'JGSフィッシュ', // ご依頼主名
+                    escapeCSV(item.itemDescription), // 品名１
+                    item.weight || 50, // 総重量(g)
                     '', // 品名詳細
                     '', // 不明品名
-                    escapeCSV(item.salesId),
+                    escapeCSV(item.salesId), // 販売ID
                     '',
                     ''
                 ];
                 rows.push(row.join(','));
             });
 
-            return rows.join('\r\n'); // Windows改行コード
+            return rows.join('\r\n');
         }
 
         function showProgress() {
@@ -1113,19 +801,16 @@
             messageArea.innerHTML = `
                 <div class="success-message">
                     <strong>変換完了！</strong><br>
-                    ${recordCount}件のデータをヤマト運輸形式に変換しました。
+                    ${recordCount}件のデータをヤマト運輸形式に変換しました。<br>
+                    商品マスタ登録件数: ${Object.keys(productMaster).length}件
                 </div>
             `;
             
             downloadButton.style.display = 'block';
-            
-            // グローバルに保存
             window.csvData = csvContent;
             
-            // ダウンロード処理
             downloadButton.onclick = () => {
                 try {
-                    // UTF-8 BOM付きでCSVを準備（Shift-JISエンコードの問題を回避）
                     const BOM = '\uFEFF';
                     const csvWithBOM = BOM + csvContent;
                     const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
@@ -1144,51 +829,28 @@
                         URL.revokeObjectURL(url);
                     }, 100);
                     
-                    // 成功メッセージを更新
                     messageArea.innerHTML = `
                         <div class="success-message">
                             <strong>ダウンロード完了！</strong><br>
-                            ${recordCount}件のデータをヤマト運輸形式でダウンロードしました。<br>
-                            ファイル名: YBMdata_${getCurrentDateString()}.csv
+                            ファイル名: YBMdata_${getCurrentDateString()}.csv<br>
+                            処理件数: ${recordCount}件<br>
+                            商品マスタ参照: ${Object.keys(productMaster).length}件
                         </div>
                     `;
                     
                 } catch (error) {
                     console.error('ダウンロードエラー:', error);
-                    debugLog('ダウンロードエラー: ' + error.message);
-                    
-                    // エラー時の代替手段を提供
-                    messageArea.innerHTML = `
-                        <div class="error-message">
-                            <strong>ダウンロードエラー</strong><br>
-                            ${error.message}<br>
-                            以下のボタンから手動でファイルを保存してください。
-                        </div>
-                        <button onclick="showTextDownload()" style="margin-top: 10px; padding: 8px 16px; background: #4299e1; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            テキスト形式で表示
-                        </button>
-                    `;
-                    
-                    // グローバル関数として定義
-                    window.showTextDownload = () => {
-                        const textAreaHtml = `
-                            <div style="margin-top: 15px;">
-                                <div style="font-weight: 600; margin-bottom: 8px;">CSVデータ（手動保存用）：</div>
-                                <textarea readonly style="width: 100%; height: 200px; font-family: monospace; font-size: 11px; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">${csvContent}</textarea>
-                                <div style="font-size: 12px; color: #666; margin-top: 8px;">
-                                    上記テキストをコピーして、メモ帳に貼り付け、「YBMdata_${getCurrentDateString()}.csv」として保存してください。
-                                </div>
-                            </div>
-                        `;
-                        messageArea.innerHTML += textAreaHtml;
-                    };
+                    showError('ダウンロードに失敗しました: ' + error.message);
                 }
             };
         }
 
         function getCurrentDateString() {
             const now = new Date();
-            return now.toISOString().split('T')[0].replace(/-/g, '');
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            return `${year}${month}${day}`;
         }
 
         function showError(message) {
@@ -1208,38 +870,30 @@
         // リセット処理
         resetButton.addEventListener('click', () => {
             // ファイル選択をリセット
-            masterFile.value = '';
             amazonFile.value = '';
             rakutenFile.value = '';
             yahooFile.value = '';
+            masterFile.value = '';
             
-            selectedFiles = { master: null, amazon: null, rakuten: null, yahoo: null };
+            selectedFiles = { amazon: null, rakuten: null, yahoo: null, master: null };
+            productMaster = {};
             
             // UI状態をリセット
-            document.getElementById('masterStatus').textContent = 'ファイルを選択してください';
-            document.getElementById('amazonStatus').textContent = 'ファイルを選択してください';
-            document.getElementById('rakutenStatus').textContent = 'ファイルを選択してください';
-            document.getElementById('yahooStatus').textContent = 'ファイルを選択してください';
+            ['amazonStatus', 'rakutenStatus', 'yahooStatus', 'masterStatus'].forEach(id => {
+                const element = document.getElementById(id);
+                element.textContent = 'ファイルを選択してください';
+                element.className = 'file-status';
+            });
             
-            document.getElementById('masterStatus').className = 'file-status';
-            document.getElementById('amazonStatus').className = 'file-status';
-            document.getElementById('rakutenStatus').className = 'file-status';
-            document.getElementById('yahooStatus').className = 'file-status';
-            
-            masterFile.classList.remove('has-file');
-            amazonFile.classList.remove('has-file');
-            rakutenFile.classList.remove('has-file');
-            yahooFile.classList.remove('has-file');
+            [amazonFile, rakutenFile, yahooFile, masterFile].forEach(input => {
+                input.classList.remove('has-file');
+            });
             
             // セクション表示をリセット
             document.querySelector('.upload-section').style.display = 'block';
             convertButton.style.display = 'block';
             progressSection.style.display = 'none';
             resultSection.style.display = 'none';
-            debugSection.style.display = 'none';
-            
-            // デバッグ情報をクリア
-            debugContent.textContent = '';
             
             updateConvertButton();
         });
