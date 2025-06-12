@@ -559,8 +559,9 @@
                 } else {
                     // 商品名から重量を推定
                     const weightMatch = productName.match(/(\d+)g/);
-                    weight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
-                    itemDescription = productName ? productName.substring(0, 50) : '商品名確認要';
+                    const unitWeight = weightMatch ? parseInt(weightMatch[1]) : 50;
+                    weight = unitWeight * quantity;
+                    itemDescription = `商品: ${unitWeight}g×${quantity}`;
                 }
 
                 if (recipientName && shipAddress && zipCode) {
@@ -575,8 +576,15 @@
                     if (customerMap.has(customerKey)) {
                         // 同一顧客の場合は統合
                         const existing = customerMap.get(customerKey);
-                        existing.weight += weight;
+                        existing.totalWeight += weight;
                         existing.salesIds.push(salesId);
+                        existing.items.push({
+                            description: itemDescription,
+                            weight: weight,
+                            unitWeight: masterInfo ? masterInfo.weight : (weightMatch ? parseInt(weightMatch[1]) : 50),
+                            quantity: quantity,
+                            color: masterInfo ? masterInfo.color : '商品'
+                        });
                     } else {
                         customerMap.set(customerKey, {
                             source: 'Amazon',
@@ -584,8 +592,14 @@
                             shipAddress: shipAddress,
                             zipCode: normalizedZip,
                             phoneNumber: normalizedPhone,
-                            weight: weight,
-                            itemDescription: itemDescription,
+                            totalWeight: weight,
+                            items: [{
+                                description: itemDescription,
+                                weight: weight,
+                                unitWeight: masterInfo ? masterInfo.weight : (weightMatch ? parseInt(weightMatch[1]) : 50),
+                                quantity: quantity,
+                                color: masterInfo ? masterInfo.color : '商品'
+                            }],
                             salesIds: [salesId]
                         });
                     }
@@ -625,22 +639,33 @@
                     const masterKey = `楽天_${itemId}`;
                     const masterInfo = productMaster[masterKey] || productMaster[itemId];
                     
-                    let weight, itemDescription;
+                    let weight, itemDescription, unitWeight, color;
                     if (masterInfo) {
                         weight = masterInfo.weight * quantity;
-                        itemDescription = `${masterInfo.color}: ${masterInfo.weight}g×${quantity}`;
+                        unitWeight = masterInfo.weight;
+                        color = masterInfo.color;
+                        itemDescription = `${color}: ${unitWeight}g×${quantity}`;
                     } else {
                         const weightMatch = itemName ? itemName.match(/(\d+)g/) : null;
-                        weight = weightMatch ? parseInt(weightMatch[1]) * quantity : 60 * quantity;
-                        itemDescription = itemName ? itemName.substring(0, 50) : '商品名確認要';
+                        unitWeight = weightMatch ? parseInt(weightMatch[1]) : 60;
+                        weight = unitWeight * quantity;
+                        color = '商品';
+                        itemDescription = `${color}: ${unitWeight}g×${quantity}`;
                     }
 
                     const customerKey = `${shipName.trim()}_${fullAddress}_${phoneNumber}`;
                     
                     if (customerMap.has(customerKey)) {
                         const existing = customerMap.get(customerKey);
-                        existing.weight += weight;
+                        existing.totalWeight += weight;
                         existing.salesIds.push(orderId);
+                        existing.items.push({
+                            description: itemDescription,
+                            weight: weight,
+                            unitWeight: unitWeight,
+                            quantity: quantity,
+                            color: color
+                        });
                     } else {
                         customerMap.set(customerKey, {
                             source: '楽天',
@@ -648,8 +673,14 @@
                             shipAddress: fullAddress,
                             zipCode: zipCode,
                             phoneNumber: phoneNumber,
-                            weight: weight,
-                            itemDescription: itemDescription,
+                            totalWeight: weight,
+                            items: [{
+                                description: itemDescription,
+                                weight: weight,
+                                unitWeight: unitWeight,
+                                quantity: quantity,
+                                color: color
+                            }],
                             salesIds: [orderId]
                         });
                     }
@@ -694,27 +725,38 @@
                         items.push({ productNo, quantity });
                     }
 
+                    const customerKey = `${shipName}_${shipAddress}_${shipPhone}`;
+
                     items.forEach(item => {
                         // 商品マスタから情報取得
                         const masterKey = `Yahoo_${item.productNo}`;
                         const masterInfo = productMaster[masterKey] || productMaster[item.productNo];
                         
-                        let weight, itemDescription;
+                        let weight, itemDescription, unitWeight, color;
                         if (masterInfo) {
                             weight = masterInfo.weight * item.quantity;
-                            itemDescription = `${masterInfo.color}: ${masterInfo.weight}g×${item.quantity}`;
+                            unitWeight = masterInfo.weight;
+                            color = masterInfo.color;
+                            itemDescription = `${color}: ${unitWeight}g×${item.quantity}`;
                         } else {
                             const weightMatch = title ? title.match(/(\d+)g/) : null;
-                            weight = weightMatch ? parseInt(weightMatch[1]) * item.quantity : 60 * item.quantity;
-                            itemDescription = title ? title.substring(0, 50) : '商品名確認要';
+                            unitWeight = weightMatch ? parseInt(weightMatch[1]) : 60;
+                            weight = unitWeight * item.quantity;
+                            color = '商品';
+                            itemDescription = `${color}: ${unitWeight}g×${item.quantity}`;
                         }
-
-                        const customerKey = `${shipName}_${shipAddress}_${shipPhone}`;
                         
                         if (customerMap.has(customerKey)) {
                             const existing = customerMap.get(customerKey);
-                            existing.weight += weight;
+                            existing.totalWeight += weight;
                             existing.salesIds.push(orderId);
+                            existing.items.push({
+                                description: itemDescription,
+                                weight: weight,
+                                unitWeight: unitWeight,
+                                quantity: item.quantity,
+                                color: color
+                            });
                         } else {
                             customerMap.set(customerKey, {
                                 source: 'Yahoo',
@@ -722,8 +764,14 @@
                                 shipAddress: shipAddress,
                                 zipCode: String(shipZip).replace(/-/g, '').padStart(7, '0'),
                                 phoneNumber: shipPhone,
-                                weight: weight,
-                                itemDescription: itemDescription,
+                                totalWeight: weight,
+                                items: [{
+                                    description: itemDescription,
+                                    weight: weight,
+                                    unitWeight: unitWeight,
+                                    quantity: item.quantity,
+                                    color: color
+                                }],
                                 salesIds: [orderId]
                             });
                         }
@@ -733,8 +781,43 @@
 
             // 統合されたデータをresultに変換
             customerMap.forEach(customer => {
+                // 色別に商品をグループ化して品名を生成
+                const colorGroups = {};
+                customer.items.forEach(item => {
+                    if (!colorGroups[item.color]) {
+                        colorGroups[item.color] = [];
+                    }
+                    colorGroups[item.color].push(item);
+                });
+
+                // 品名を「色: 重さ×個数」形式で統合
+                const itemDescriptions = [];
+                Object.keys(colorGroups).forEach(color => {
+                    const items = colorGroups[color];
+                    // 同じ色の商品を重量別にグループ化
+                    const weightGroups = {};
+                    items.forEach(item => {
+                        if (!weightGroups[item.unitWeight]) {
+                            weightGroups[item.unitWeight] = 0;
+                        }
+                        weightGroups[item.unitWeight] += item.quantity;
+                    });
+                    
+                    // 重量ごとに品名を作成
+                    Object.keys(weightGroups).forEach(weight => {
+                        const totalQty = weightGroups[weight];
+                        itemDescriptions.push(`${color}: ${weight}g×${totalQty}`);
+                    });
+                });
+
                 result.push({
-                    ...customer,
+                    source: customer.source,
+                    recipientName: customer.recipientName,
+                    shipAddress: customer.shipAddress,
+                    zipCode: customer.zipCode,
+                    phoneNumber: customer.phoneNumber,
+                    weight: customer.totalWeight,
+                    itemDescription: itemDescriptions.join(', '),
                     salesId: customer.salesIds.join(',')
                 });
             });
