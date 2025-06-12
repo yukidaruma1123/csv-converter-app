@@ -242,7 +242,7 @@
         <div class="upload-section">
             <div class="file-group">
                 <label class="file-label">商品マスタ (Excel/CSV形式)</label>
-                <input type="file" id="masterFile" class="file-input" accept=".xlsx,.xls,.csv">
+                <input type="file" id="masterFile" class="file-input" accept=".xlsx,.xls,.xlsm,.csv">
                 <div class="file-status" id="masterStatus">商品マスタファイルを選択してください</div>
             </div>
 
@@ -294,6 +294,7 @@
                 <li>3. 「データを変換してダウンロード」をクリック</li>
                 <li>4. 変換完了後、ヤマト運輸用CSVをダウンロード</li>
                 <li>※ ファイル形式：Amazon(TSV)、楽天・Yahoo(CSV)、商品マスタ(Excel/CSV)</li>
+                <li>※ .xlsm ファイルが表示されない場合は「すべてのファイル」を選択してください</li>
             </ul>
         </div>
     </div>
@@ -337,24 +338,47 @@
             const statusElement = document.getElementById(statusId);
             const inputElement = event.target;
 
+            console.log(`ファイル選択: ${type}`, file); // デバッグ用ログ
+
             if (file) {
                 selectedFiles[type] = file;
                 statusElement.textContent = `選択済み: ${file.name}`;
                 statusElement.className = 'file-status success';
                 inputElement.classList.add('has-file');
+                
+                console.log(`${type}ファイル選択完了:`, file.name); // デバッグ用ログ
             } else {
                 selectedFiles[type] = null;
                 statusElement.textContent = type === 'master' ? '商品マスタファイルを選択してください' : 'ファイルを選択してください';
                 statusElement.className = 'file-status';
                 inputElement.classList.remove('has-file');
+                
+                console.log(`${type}ファイル選択解除`); // デバッグ用ログ
             }
 
+            console.log('現在の選択状況:', selectedFiles); // デバッグ用ログ
             updateConvertButton();
         }
 
         function updateConvertButton() {
             const allFilesSelected = selectedFiles.master && selectedFiles.amazon && selectedFiles.rakuten && selectedFiles.yahoo;
+            console.log('ボタン更新チェック:', {
+                master: !!selectedFiles.master,
+                amazon: !!selectedFiles.amazon,
+                rakuten: !!selectedFiles.rakuten,
+                yahoo: !!selectedFiles.yahoo,
+                allSelected: allFilesSelected
+            }); // デバッグ用ログ
+            
             convertButton.disabled = !allFilesSelected;
+            
+            if (allFilesSelected) {
+                convertButton.style.opacity = '1';
+                convertButton.style.cursor = 'pointer';
+            } else {
+                convertButton.style.opacity = '0.6';
+                convertButton.style.cursor = 'not-allowed';
+            }
         }
 
         // 変換処理
@@ -397,32 +421,131 @@
         });
 
         async function loadProductMaster(file) {
-            // サンプル商品マスタデータを使用
-            const sampleMasterData = [
-                { site: 'Amazon', productNo: 'E6-0CH8-6Q1F', detail: 'バラ売り 45g 60g 80g 100g (色指定) タイラバ', weight: 60, quantity: 1, color: '金' },
-                { site: 'Amazon', productNo: 'PB-BVHJ-U5T9', detail: '3個セット (150g) 鯛ラバ タイラバ', weight: 150, quantity: 3, color: '金' },
-                { site: 'Amazon', productNo: '7R-JWN3-TP62', detail: '3個セット(80g) 鯛ラバ タイラバ', weight: 80, quantity: 3, color: '金' },
-                { site: 'Amazon', productNo: '8J-R9XT-UC8R', detail: '3個セット(45g) 鯛ラバ タイラバ', weight: 45, quantity: 3, color: '金' },
-                { site: 'Amazon', productNo: 'DX-8VPL-W24D', detail: '3個セット(60g) 鯛ラバ タイラバ', weight: 60, quantity: 3, color: '金' },
-                { site: 'Amazon', productNo: 'GF-L5Z0-WWSE', detail: '3個セット(100g) 鯛ラバ タイラバ', weight: 100, quantity: 3, color: '金' },
-                { site: 'Amazon', productNo: 'AI-N2TW-JST2', detail: 'バラ売り 45g 60g 80g 100g (色指定) タイラバ', weight: 60, quantity: 1, color: '金' },
-                { site: 'Amazon', productNo: 'VU-JCJC-XANI', detail: 'バラ売り 45g 60g 80g 100g (色指定) タイラバ', weight: 80, quantity: 1, color: '金' },
-                { site: 'Amazon', productNo: 'BV-ZI9J-146V', detail: 'バラ売り 45g 60g 80g 100g (色指定) タイラバ', weight: 100, quantity: 1, color: '金' },
-                // 楽天用サンプルデータ
-                { site: '楽天', productNo: 'raku001', detail: '送料無料 4個セット バランス良し 60g1個 80g2個 100g1個 タイラバ', weight: 60, quantity: 4, color: '銀' },
-                { site: '楽天', productNo: 'raku002', detail: '【送料無料】60g お得4個セット 鯛ラバ', weight: 60, quantity: 4, color: '銀' },
-                // Yahoo用サンプルデータ
-                { site: 'Yahoo', productNo: 'bara60', detail: '【送料無料】60g 大量割引き 10個 タイラバ', weight: 60, quantity: 10, color: '銀' },
-                { site: 'Yahoo', productNo: 'bara80', detail: '【送料無料】80g タイラバ', weight: 80, quantity: 1, color: '銀' }
-            ];
+            const fileName = file.name.toLowerCase();
+            console.log('商品マスタファイル読み込み開始:', fileName);
+            
+            if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.xlsm')) {
+                // Excelファイルの場合
+                console.log('Excelファイルとして処理');
+                const buffer = await file.arrayBuffer();
+                const workbook = XLSX.read(buffer, { type: 'buffer' });
+                
+                console.log('利用可能なシート:', workbook.SheetNames);
+                
+                // 商品マスタシートを探す
+                let sheetName = null;
+                for (const name of workbook.SheetNames) {
+                    if (name.includes('商品マスタ') || name.includes('マスタ') || name === 'Sheet1') {
+                        sheetName = name;
+                        break;
+                    }
+                }
+                
+                if (!sheetName) {
+                    sheetName = workbook.SheetNames[0]; // 最初のシートを使用
+                    console.log('商品マスタシートが見つからないため、最初のシートを使用:', sheetName);
+                }
+                
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                console.log('読み込まれたデータ行数:', jsonData.length);
+                console.log('ヘッダー行:', jsonData[0]);
+                
+                // ヘッダー行を取得（1行目）
+                const headers = jsonData[0];
+                
+                // データ行を処理
+                productMaster = {};
+                for (let i = 1; i < jsonData.length; i++) {
+                    const row = jsonData[i];
+                    if (!row || row.length === 0) continue;
+                    
+                    const item = {};
+                    headers.forEach((header, index) => {
+                        item[header] = row[index];
+                    });
+                    
+                    const productNo = item['商品No'] || item['商品番号'] || item['SKU'];
+                    const site = item['販売サイト'] || item['サイト'];
+                    
+                    if (productNo && site) {
+                        const key = `${site}_${productNo}`;
+                        productMaster[key] = {
+                            site: site,
+                            productNo: productNo,
+                            detail: item['商品詳細'] || item['商品名'] || '',
+                            weight: parseFloat(item['重さ'] || item['重量'] || 0),
+                            quantity: parseInt(item['個数'] || item['数量'] || 1),
+                            color: item['色'] || item['カラー'] || ''
+                        };
+                    }
+                }
+                
+                console.log('Excelから読み込んだ商品マスタ件数:', Object.keys(productMaster).length);
+                
+            } else if (fileName.endsWith('.csv')) {
+                // CSVファイルの場合
+                console.log('CSVファイルとして処理');
+                const csvData = await readFile(file, 'auto');
+                const parsed = Papa.parse(csvData, {
+                    header: true,
+                    skipEmptyLines: true,
+                    dynamicTyping: false
+                });
+                
+                console.log('CSVデータ行数:', parsed.data.length);
+                
+                productMaster = {};
+                parsed.data.forEach(row => {
+                    const productNo = row['商品No'] || row['商品番号'] || row['SKU'];
+                    const site = row['販売サイト'] || row['サイト'];
+                    
+                    if (productNo && site) {
+                        const key = `${site}_${productNo}`;
+                        productMaster[key] = {
+                            site: site,
+                            productNo: productNo,
+                            detail: row['商品詳細'] || row['商品名'] || '',
+                            weight: parseFloat(row['重さ'] || row['重量'] || 0),
+                            quantity: parseInt(row['個数'] || row['数量'] || 1),
+                            color: row['色'] || row['カラー'] || ''
+                        };
+                    }
+                });
+                
+                console.log('CSVから読み込んだ商品マスタ件数:', Object.keys(productMaster).length);
+                
+            } else {
+                console.log('サポートされていないファイル形式、サンプルデータを使用');
+                // サンプル商品マスタデータを使用
+                const sampleMasterData = [
+                    { site: 'Amazon', productNo: 'E6-0CH8-6Q1F', detail: 'バラ売り 45g 60g 80g 100g (色指定) タイラバ', weight: 60, quantity: 1, color: '金' },
+                    { site: 'Amazon', productNo: 'PB-BVHJ-U5T9', detail: '3個セット (150g) 鯛ラバ タイラバ', weight: 150, quantity: 3, color: '金' },
+                    { site: 'Amazon', productNo: '7R-JWN3-TP62', detail: '3個セット(80g) 鯛ラバ タイラバ', weight: 80, quantity: 3, color: '金' },
+                    { site: 'Amazon', productNo: '8J-R9XT-UC8R', detail: '3個セット(45g) 鯛ラバ タイラバ', weight: 45, quantity: 3, color: '金' },
+                    { site: 'Amazon', productNo: 'DX-8VPL-W24D', detail: '3個セット(60g) 鯛ラバ タイラバ', weight: 60, quantity: 3, color: '金' },
+                    { site: 'Amazon', productNo: 'GF-L5Z0-WWSE', detail: '3個セット(100g) 鯛ラバ タイラバ', weight: 100, quantity: 3, color: '金' },
+                    { site: 'Amazon', productNo: 'AI-N2TW-JST2', detail: 'バラ売り 45g 60g 80g 100g (色指定) タイラバ', weight: 60, quantity: 1, color: '金' },
+                    { site: 'Amazon', productNo: 'VU-JCJC-XANI', detail: 'バラ売り 45g 60g 80g 100g (色指定) タイラバ', weight: 80, quantity: 1, color: '金' },
+                    { site: 'Amazon', productNo: 'BV-ZI9J-146V', detail: 'バラ売り 45g 60g 80g 100g (色指定) タイラバ', weight: 100, quantity: 1, color: '金' },
+                    // 楽天用サンプルデータ
+                    { site: '楽天', productNo: 'raku001', detail: '送料無料 4個セット バランス良し 60g1個 80g2個 100g1個 タイラバ', weight: 60, quantity: 4, color: '銀' },
+                    { site: '楽天', productNo: 'raku002', detail: '【送料無料】60g お得4個セット 鯛ラバ', weight: 60, quantity: 4, color: '銀' },
+                    // Yahoo用サンプルデータ
+                    { site: 'Yahoo', productNo: 'bara60', detail: '【送料無料】60g 大量割引き 10個 タイラバ', weight: 60, quantity: 10, color: '銀' },
+                    { site: 'Yahoo', productNo: 'bara80', detail: '【送料無料】80g タイラバ', weight: 80, quantity: 1, color: '銀' }
+                ];
 
-            productMaster = {};
-            sampleMasterData.forEach(item => {
-                const key = `${item.site}_${item.productNo}`;
-                productMaster[key] = item;
-            });
+                productMaster = {};
+                sampleMasterData.forEach(item => {
+                    const key = `${item.site}_${item.productNo}`;
+                    productMaster[key] = item;
+                });
+            }
 
             console.log('商品マスタ読み込み完了:', Object.keys(productMaster).length, '件');
+            console.log('商品マスタ内容:', productMaster);
         }
 
         async function readFile(file, encoding) {
