@@ -657,15 +657,29 @@
                     const orderId = fields[0];
                     const orderItemId = fields[1];
 
+                    console.log(`Amazon商品検索: ${sku}`);
+
                     // 商品マスタから情報取得
                     const masterInfo = productMasterData[sku];
                     let weight = 50; // デフォルト値
                     let productDetail = productName || '';
 
-                    if (masterInfo && masterInfo.site === 'Amazon') {
-                        weight = (masterInfo.weight * masterInfo.quantity) * quantity;
-                        productDetail = `${masterInfo.color}: ${masterInfo.weight}g×${masterInfo.quantity}個×${quantity}`;
+                    if (masterInfo) {
+                        console.log(`Amazon商品マスタ発見: ${sku} (行${masterInfo.rowIndex}) - サイト:${masterInfo.site}`);
+                        
+                        // Amazon商品またはサイト情報が空の場合も受け入れる
+                        if (masterInfo.site === 'Amazon' || masterInfo.site === '' || masterInfo.site.toLowerCase().includes('amazon')) {
+                            weight = (masterInfo.weight * masterInfo.quantity) * quantity;
+                            productDetail = `${masterInfo.color}: ${masterInfo.weight}g×${masterInfo.quantity}個×${quantity}`;
+                            console.log(`Amazon商品マスタ適用: 重量=${weight}g`);
+                        } else {
+                            console.log(`Amazon商品のサイト不一致: ${masterInfo.site}`);
+                            warnings.push(`Amazon商品 ${sku} のサイト情報が一致しません (${masterInfo.site})`);
+                            weight = 50 * quantity;
+                        }
                     } else {
+                        console.log(`Amazon商品マスタ未発見: ${sku}`);
+                        console.log('利用可能な商品No:', Object.keys(productMasterData).filter(key => key.includes(sku) || sku.includes(key)));
                         warnings.push(`Amazon商品 ${sku} が商品マスタに見つかりません`);
                         weight = 50 * quantity;
                     }
@@ -715,15 +729,29 @@
                     const fullAddress = `${shipPref}${shipCity || ''}${shipAddr || ''}`;
                     const phoneNumber = normalizePhoneNumber((shipPhone1 || '') + (shipPhone2 || '') + (shipPhone3 || ''));
                     
+                    console.log(`楽天商品検索: ${itemId}`);
+                    
                     // 商品マスタから情報取得
                     const masterInfo = productMasterData[itemId];
                     let weight = 50; // デフォルト値
                     let productDetail = itemName || '';
 
-                    if (masterInfo && masterInfo.site === '楽天') {
-                        weight = (masterInfo.weight * masterInfo.quantity) * quantity;
-                        productDetail = `${masterInfo.color}: ${masterInfo.weight}g×${masterInfo.quantity}個×${quantity}`;
+                    if (masterInfo) {
+                        console.log(`楽天商品マスタ発見: ${itemId} (行${masterInfo.rowIndex}) - サイト:${masterInfo.site}`);
+                        
+                        // 楽天商品またはサイト情報が空の場合も受け入れる
+                        if (masterInfo.site === '楽天' || masterInfo.site === '' || masterInfo.site.toLowerCase().includes('rakuten')) {
+                            weight = (masterInfo.weight * masterInfo.quantity) * quantity;
+                            productDetail = `${masterInfo.color}: ${masterInfo.weight}g×${masterInfo.quantity}個×${quantity}`;
+                            console.log(`楽天商品マスタ適用: 重量=${weight}g`);
+                        } else {
+                            console.log(`楽天商品のサイト不一致: ${masterInfo.site}`);
+                            warnings.push(`楽天商品 ${itemId} のサイト情報が一致しません (${masterInfo.site})`);
+                            weight = 50 * quantity;
+                        }
                     } else {
+                        console.log(`楽天商品マスタ未発見: ${itemId}`);
+                        console.log('利用可能な商品No:', Object.keys(productMasterData).filter(key => key.includes(itemId) || itemId.includes(key)));
                         warnings.push(`楽天商品 ${itemId} が商品マスタに見つかりません`);
                         weight = 50 * quantity;
                     }
