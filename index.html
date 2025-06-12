@@ -616,7 +616,7 @@
                         const unitWeight = masterInfo.weight || 50; // D列
                         const unitQuantity = masterInfo.quantity || 1; // E列
                         weight = (unitWeight * unitQuantity) * quantity;
-                        productDetail = `${masterInfo.color}: ${unitWeight}g×${unitQuantity}個×${quantity}注文`;
+                        productDetail = `${masterInfo.color}: ${unitWeight}g×${unitQuantity}`;
                     } else {
                         // 商品名から重量を推定
                         const weightMatch = productName?.match(/(\d+)g/);
@@ -696,7 +696,7 @@
                         const unitWeight = masterInfo.weight || 50; // D列
                         const unitQuantity = masterInfo.quantity || 1; // E列
                         weight = (unitWeight * unitQuantity) * quantity;
-                        productDetail = `${masterInfo.color}: ${unitWeight}g×${unitQuantity}個×${quantity}注文`;
+                        productDetail = `${masterInfo.color}: ${unitWeight}g×${unitQuantity}`;
                     } else {
                         const weightMatch = itemName?.match(/(\d+)g/);
                         if (weightMatch) {
@@ -751,13 +751,13 @@
 
                     if (!shipName || !shipAddress || !shipZip || !shipPhone || !orderId) return;
 
-                    // Yahoo商品IDの処理（複数商品対応）
+                    // Yahoo商品IDの処理
                     let totalWeight = 0;
                     let productDetails = [];
                     let totalQuantity = 0;
 
                     if (itemId?.includes('&')) {
-                        // 複数商品の場合
+                        // 複数商品の場合（例: L1=bara60&L2=bara80）
                         const items = itemId.split('&');
                         items.forEach(item => {
                             const [itemCode, subCode] = item.split('=');
@@ -771,10 +771,11 @@
                                 const unitQuantity = masterInfo.quantity || 1; // E列
                                 const itemTotalWeight = (unitWeight * unitQuantity) * quantity;
                                 totalWeight += itemTotalWeight;
-                                productDetails.push(`${masterInfo.color}: ${unitWeight}g×${unitQuantity}個×${quantity}注文`);
+                                productDetails.push(`${masterInfo.color}: ${unitWeight}g×${unitQuantity}`);
                                 totalQuantity += quantity;
                             } else {
                                 totalWeight += 50 * quantity;
+                                productDetails.push(`不明商品: ${cleanItemCode}`);
                                 totalQuantity += quantity;
                             }
                         });
@@ -788,10 +789,12 @@
                             const unitWeight = masterInfo.weight || 50; // D列
                             const unitQuantity = masterInfo.quantity || 1; // E列
                             totalWeight = (unitWeight * unitQuantity) * quantity;
-                            productDetails.push(`${masterInfo.color}: ${unitWeight}g×${unitQuantity}個×${quantity}注文`);
+                            productDetails.push(`${masterInfo.color}: ${unitWeight}g×${unitQuantity}`);
                         } else {
+                            // 商品マスタにない場合、タイトルから重量推定
                             const weightMatch = title?.match(/(\d+)g/);
                             totalWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
+                            productDetails.push(`不明商品: ${itemId}`);
                         }
                         totalQuantity = quantity;
                     }
@@ -799,7 +802,7 @@
                     orders.push({
                         source: 'Yahoo',
                         sku: itemId,
-                        productName: productDetails.join(', ') || title,
+                        productName: productDetails.join(', '),
                         quantity: totalQuantity,
                         recipientName: shipName,
                         shipAddress: shipAddress,
