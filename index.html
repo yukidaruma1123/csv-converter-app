@@ -567,6 +567,11 @@
                     const customerKey = `${recipientName}_${shipAddress}_${phoneNumber}`;
                     const salesId = `${orderId}:${orderItemId}:${quantity}`;
                     
+                    // 郵便番号を7桁に正規化（ハイフンなし）
+                    const normalizedZip = zipCode.replace(/-/g, '').padStart(7, '0');
+                    // 電話番号を正規化（先頭0付与）
+                    const normalizedPhone = phoneNumber.startsWith('0') ? phoneNumber : '0' + phoneNumber;
+                    
                     if (customerMap.has(customerKey)) {
                         // 同一顧客の場合は統合
                         const existing = customerMap.get(customerKey);
@@ -577,8 +582,8 @@
                             source: 'Amazon',
                             recipientName: recipientName,
                             shipAddress: shipAddress,
-                            zipCode: zipCode.replace(/-/g, '').padStart(7, '0'),
-                            phoneNumber: phoneNumber.startsWith('0') ? phoneNumber : '0' + phoneNumber,
+                            zipCode: normalizedZip,
+                            phoneNumber: normalizedPhone,
                             weight: weight,
                             itemDescription: itemDescription,
                             salesIds: [salesId]
@@ -738,7 +743,31 @@
         }
 
         function generateYamatoCSV(data) {
-            const rows = [];
+            // ヘッダー行を追加
+            const headers = [
+                '送り状種類',
+                '出荷予定日', 
+                'お届け予定日',
+                '配達時間帯',
+                'お届け先電話番号',
+                'お届け先郵便番号',
+                'お届け先住所',
+                'お届け先アパートマンション名',
+                'お届け先名',
+                'ご依頼主電話番号',
+                'ご依頼主郵便番号',
+                'ご依頼主住所',
+                'ご依頼主名',
+                '品名１',
+                '総重量(g)',
+                '品名詳細',
+                '不明品名',
+                '販売ID',
+                '',
+                ''
+            ];
+            
+            const rows = [headers.join(',')];
             
             // 現在の日付（出荷予定日）
             const today = new Date();
@@ -754,18 +783,24 @@
                     return strValue;
                 };
                 
+                // 郵便番号のフォーマット（ハイフン付き7桁）
+                const formatZipCode = (zip) => {
+                    const cleanZip = String(zip).replace(/-/g, '').padStart(7, '0');
+                    return cleanZip.substring(0, 3) + '-' + cleanZip.substring(3);
+                };
+                
                 const row = [
                     '7', // ネコポス・クロネコゆうパケット
                     shipDate, // 出荷予定日
                     '', // お届け予定日
                     '', // 配達時間帯
                     escapeCSV(item.phoneNumber), // お届け先電話番号
-                    escapeCSV(item.zipCode), // お届け先郵便番号
+                    formatZipCode(item.zipCode), // お届け先郵便番号（ハイフン付き）
                     escapeCSV(item.shipAddress), // お届け先住所
                     '', // アパートマンション名
                     escapeCSV(item.recipientName), // お届け先名
                     '050-3590-1444', // ご依頼主電話番号
-                    '1040061', // ご依頼主郵便番号
+                    '104-0061', // ご依頼主郵便番号（ハイフン付き）
                     '東京都中央区銀座1-22-11 2F', // ご依頼主住所
                     'JGSフィッシュ', // ご依頼主名
                     escapeCSV(item.itemDescription), // 品名１
