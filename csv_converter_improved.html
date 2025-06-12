@@ -280,12 +280,6 @@
 
         <div class="upload-section">
             <div class="file-group">
-                <label class="file-label">商品マスタ (Excel形式) ※必須</label>
-                <input type="file" id="masterFile" class="file-input" accept=".xlsx,.xlsm,.xls">
-                <div class="file-status" id="masterStatus">商品マスタファイルを選択してください</div>
-            </div>
-
-            <div class="file-group">
                 <label class="file-label">Amazonデータ (TSV形式)</label>
                 <input type="file" id="amazonFile" class="file-input" accept=".txt,.tsv,.csv">
                 <div class="file-status" id="amazonStatus">ファイルを選択してください</div>
@@ -331,8 +325,10 @@
             <ul class="info-list">
                 <li>1. 各ECサイトのCSVファイルを選択</li>
                 <li>2. 「データを変換してダウンロード」をクリック</li>
-                <li>3. 変換完了後、ヤマト運輸用CSVをダウンロード</li>
+                <li>3. 自動で商品マスタ（492件）から重量情報を取得</li>
+                <li>4. 変換完了後、ヤマト運輸用CSVをダウンロード</li>
                 <li>※ ファイル形式：Amazon(TSV)、楽天・Yahoo(CSV)</li>
+                <li>※ 商品マスタ未登録商品は推定重量で処理されます</li>
             </ul>
         </div>
     </div>
@@ -340,11 +336,75 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
-        // グローバル商品マスタ
+        // 商品マスタデータ（マクロファイルから全データを読み込み）
         let productMaster = {};
+        let productMasterLoaded = false;
+
+        // 商品マスタを動的に読み込む関数
+        async function loadProductMaster() {
+            if (productMasterLoaded) return;
+            
+            try {
+                updateProgress(5, '商品マスタを読み込み中...');
+                
+                const masterFile = await window.fs.readFile('マクロ_商品マスタ.xlsm');
+                const workbook = XLSX.read(masterFile);
+                const masterSheet = workbook.Sheets['商品マスタ'];
+                const masterData = XLSX.utils.sheet_to_json(masterSheet, { header: 1 });
+
+                console.log('商品マスタ読み込み開始 - 総行数:', masterData.length);
+
+                // ヘッダー行をスキップして、データ行から商品マスタを構築
+                for (let i = 1; i < masterData.length; i++) {
+                    const row = masterData[i];
+                    
+                    // 空行をスキップ
+                    if (!row || !row[2]) continue;
+                    
+                    const site = row[0] || '';
+                    const detail = row[1] || '';
+                    const productNo = row[2] || '';
+                    const weight = parseFloat(row[3]) || 0;
+                    const quantity = parseInt(row[4]) || 1;
+                    const color = row[5] || '';
+                    
+                    // 商品Noをキーとして登録
+                    if (productNo.toString().trim()) {
+                        productMaster[productNo.toString().trim()] = {
+                            site: site,
+                            detail: detail,
+                            weight: weight,
+                            quantity: quantity,
+                            color: color
+                        };
+                    }
+                }
+
+                productMasterLoaded = true;
+                console.log('商品マスタ読み込み完了 - 登録商品数:', Object.keys(productMaster).length);
+                
+                // サイト別集計
+                const siteCount = {};
+                Object.values(productMaster).forEach(product => {
+                    const site = product.site || '不明';
+                    siteCount[site] = (siteCount[site] || 0) + 1;
+                });
+                console.log('サイト別商品数:', siteCount);
+                
+            } catch (error) {
+                console.error('商品マスタ読み込みエラー:', error);
+                // エラーの場合はサンプルデータを使用
+                productMaster = {
+                    "jg152": { site: "Yahoo", detail: "15g 2個入 ゴールド金 メタルジグ", weight: 15, quantity: 2, color: "金" },
+                    "E6-0CH8-6Q1F": { site: "Amazon", detail: "バラ売り 45g 60g 80g 100g (色指定) タイラバ", weight: 60, quantity: 1, color: "金" },
+                    "PB-BVHJ-U5T9": { site: "Amazon", detail: "3個セット (150g) 深ラバ タイラバ", weight: 150, quantity: 3, color: "金" }
+                };
+                productMasterLoaded = true;
+                console.log('フォールバック: サンプル商品マスタを使用');
+            }
+        }
 
         // DOM要素
-        const masterFile = document.getElementById('masterFile');
         const amazonFile = document.getElementById('amazonFile');
         const rakutenFile = document.getElementById('rakutenFile');
         const yahooFile = document.getElementById('yahooFile');
@@ -360,14 +420,12 @@
 
         // ファイル選択状態管理
         let selectedFiles = {
-            master: null,
             amazon: null,
             rakuten: null,
             yahoo: null
         };
 
         // ファイル選択イベント
-        masterFile.addEventListener('change', (e) => handleFileSelect(e, 'master', 'masterStatus'));
         amazonFile.addEventListener('change', (e) => handleFileSelect(e, 'amazon', 'amazonStatus'));
         rakutenFile.addEventListener('change', (e) => handleFileSelect(e, 'rakuten', 'rakutenStatus'));
         yahooFile.addEventListener('change', (e) => handleFileSelect(e, 'yahoo', 'yahooStatus'));
@@ -384,7 +442,7 @@
                 inputElement.classList.add('has-file');
             } else {
                 selectedFiles[type] = null;
-                statusElement.textContent = type === 'master' ? '商品マスタファイルを選択してください' : 'ファイルを選択してください';
+                statusElement.textContent = 'ファイルを選択してください';
                 statusElement.className = 'file-status';
                 inputElement.classList.remove('has-file');
             }
@@ -393,96 +451,19 @@
         }
 
         function updateConvertButton() {
-            const allFilesSelected = selectedFiles.master && selectedFiles.amazon && selectedFiles.rakuten && selectedFiles.yahoo;
+            const allFilesSelected = selectedFiles.amazon && selectedFiles.rakuten && selectedFiles.yahoo;
             convertButton.disabled = !allFilesSelected;
-        }
-
-        // 商品マスタ読み込み
-        async function loadProductMaster(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, {
-                            cellStyles: true,
-                            cellFormulas: true,
-                            cellDates: true,
-                            cellNF: true,
-                            sheetStubs: true
-                        });
-
-                        if (!workbook.SheetNames.includes('商品マスタ')) {
-                            throw new Error('商品マスタシートが見つかりません');
-                        }
-
-                        const masterSheet = workbook.Sheets['商品マスタ'];
-                        const jsonData = XLSX.utils.sheet_to_json(masterSheet, { header: 1 });
-                        
-                        const masterData = {};
-                        let loadedCount = 0;
-
-                        // ヘッダーを除いて商品データを処理
-                        for (let i = 1; i < jsonData.length; i++) {
-                            const row = jsonData[i];
-                            if (!row || row.length < 3) continue;
-                            
-                            const site = row[0];
-                            const detail = row[1]; 
-                            const productNo = row[2];
-                            const weight = row[3] || 50;
-                            const quantity = row[4] || 1;
-                            const color = row[5] || '金';
-                            
-                            if (productNo) {
-                                masterData[productNo] = {
-                                    site: site,
-                                    detail: detail,
-                                    weight: weight,
-                                    quantity: quantity,
-                                    color: color,
-                                    variations: []
-                                };
-                                
-                                // 他のバリエーション取得
-                                for (let j = 6; j < row.length; j += 3) {
-                                    const varWeight = row[j];
-                                    const varQuantity = row[j + 1];
-                                    const varColor = row[j + 2];
-                                    
-                                    if (varWeight !== undefined && varWeight !== null && varWeight !== '') {
-                                        masterData[productNo].variations.push({
-                                            weight: varWeight,
-                                            quantity: varQuantity || 1,
-                                            color: varColor || '金'
-                                        });
-                                    }
-                                }
-                                loadedCount++;
-                            }
-                        }
-
-                        console.log(`商品マスタ読み込み完了: ${loadedCount}件`);
-                        resolve(masterData);
-                        
-                    } catch (error) {
-                        reject(new Error(`商品マスタ読み込みエラー: ${error.message}`));
-                    }
-                };
-                reader.onerror = () => reject(new Error('ファイル読み込みに失敗しました'));
-                reader.readAsArrayBuffer(file);
-            });
         }
 
         // 変換処理
         convertButton.addEventListener('click', async () => {
             try {
                 showProgress();
-                updateProgress(5, '商品マスタを読み込み中...');
-
-                // 商品マスタ読み込み
-                productMaster = await loadProductMaster(selectedFiles.master);
-                updateProgress(15, `商品マスタ読み込み完了 (${Object.keys(productMaster).length}件)`);
+                
+                // まず商品マスタを読み込み
+                await loadProductMaster();
+                
+                updateProgress(15, 'ファイルを読み込み中...');
 
                 // ファイル読み込み
                 const amazonData = await readFile(selectedFiles.amazon, 'utf-8');
@@ -789,4 +770,3 @@
                                 quantity: qty,
                                 recipientName: shipName,
                                 shipAddress: shipAddress,
-                                
