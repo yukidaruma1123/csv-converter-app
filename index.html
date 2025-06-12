@@ -608,12 +608,15 @@
 
                     // 商品マスタから重量情報取得
                     const masterInfo = productMaster[sku];
-                    let weight = 50;
+                    let weight = 50 * quantity; // デフォルト重量×注文数
                     let productDetail = productName;
 
                     if (masterInfo) {
-                        weight = (masterInfo.weight || 50) * quantity;
-                        productDetail = `${masterInfo.color}: ${masterInfo.weight}g×${quantity}個`;
+                        // 総重量 = (D列×E列) × 注文数
+                        const unitWeight = masterInfo.weight || 50; // D列
+                        const unitQuantity = masterInfo.quantity || 1; // E列
+                        weight = (unitWeight * unitQuantity) * quantity;
+                        productDetail = `${masterInfo.color}: ${unitWeight}g×${unitQuantity}個×${quantity}注文`;
                     } else {
                         // 商品名から重量を推定
                         const weightMatch = productName?.match(/(\d+)g/);
@@ -685,12 +688,15 @@
 
                     // 商品マスタから重量取得
                     const masterInfo = productMaster[itemId];
-                    let weight = 50;
+                    let weight = 50 * quantity; // デフォルト重量×注文数
                     let productDetail = itemName;
 
                     if (masterInfo) {
-                        weight = (masterInfo.weight || 50) * quantity;
-                        productDetail = `${masterInfo.color}: ${masterInfo.weight}g×${quantity}個`;
+                        // 総重量 = (D列×E列) × 注文数
+                        const unitWeight = masterInfo.weight || 50; // D列
+                        const unitQuantity = masterInfo.quantity || 1; // E列
+                        weight = (unitWeight * unitQuantity) * quantity;
+                        productDetail = `${masterInfo.color}: ${unitWeight}g×${unitQuantity}個×${quantity}注文`;
                     } else {
                         const weightMatch = itemName?.match(/(\d+)g/);
                         if (weightMatch) {
@@ -760,12 +766,17 @@
                             
                             const masterInfo = productMaster[cleanItemCode];
                             if (masterInfo) {
-                                totalWeight += (masterInfo.weight || 50) * quantity;
-                                productDetails.push(`${masterInfo.color}: ${masterInfo.weight}g×${quantity}個`);
+                                // 総重量 = (D列×E列) × 注文数
+                                const unitWeight = masterInfo.weight || 50; // D列
+                                const unitQuantity = masterInfo.quantity || 1; // E列
+                                const itemTotalWeight = (unitWeight * unitQuantity) * quantity;
+                                totalWeight += itemTotalWeight;
+                                productDetails.push(`${masterInfo.color}: ${unitWeight}g×${unitQuantity}個×${quantity}注文`);
+                                totalQuantity += quantity;
                             } else {
                                 totalWeight += 50 * quantity;
+                                totalQuantity += quantity;
                             }
-                            totalQuantity += quantity;
                         });
                     } else {
                         // 単一商品の場合
@@ -773,8 +784,11 @@
                         const masterInfo = productMaster[itemId];
                         
                         if (masterInfo) {
-                            totalWeight = (masterInfo.weight || 50) * quantity;
-                            productDetails.push(`${masterInfo.color}: ${masterInfo.weight}g×${quantity}個`);
+                            // 総重量 = (D列×E列) × 注文数
+                            const unitWeight = masterInfo.weight || 50; // D列
+                            const unitQuantity = masterInfo.quantity || 1; // E列
+                            totalWeight = (unitWeight * unitQuantity) * quantity;
+                            productDetails.push(`${masterInfo.color}: ${unitWeight}g×${unitQuantity}個×${quantity}注文`);
                         } else {
                             const weightMatch = title?.match(/(\d+)g/);
                             totalWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
