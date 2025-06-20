@@ -712,9 +712,13 @@
                     const shipPhone3 = row['送付先電話番号3']?.trim() || '';
                     const phoneNumber = formatPhoneNumber(`${shipPhone1}-${shipPhone2}-${shipPhone3}`);
                     
-                    const shipZip1 = row['送付先郵便番号1']?.trim() || '';
-                    const shipZip2 = row['送付先郵便番号2']?.trim() || '';
-                    const zipCode = formatZipCode(`${shipZip1}${shipZip2}`);
+                    const shipZip1 = row['送付先郵便番号1']?.toString().trim() || '';
+                    const shipZip2 = row['送付先郵便番号2']?.toString().trim() || '';
+                    
+                    // 楽天郵便番号: AJ列を3桁、AK列を4桁に0埋め
+                    const paddedZip1 = shipZip1.padStart(3, '0');
+                    const paddedZip2 = shipZip2.padStart(4, '0');
+                    const zipCode = formatZipCode(`${paddedZip1}${paddedZip2}`);
                     
                     const shipPref = row['送付先住所都道府県']?.trim() || '';
                     const shipCity = row['送付先住所郡市区']?.trim() || '';
