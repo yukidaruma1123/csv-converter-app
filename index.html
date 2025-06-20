@@ -649,11 +649,14 @@
                         
                         masterInfo.colorSets.forEach(set => {
                             unitTotalWeight += set.weight * set.quantity;
-                            detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                            detailParts.push({
+                                color: set.color,
+                                detail: `${set.weight}g×${set.quantity}`
+                            });
                         });
                         
                         weight = unitTotalWeight * quantity;
-                        productDetail = detailParts.join(', ');
+                        productDetail = formatColorDetails(detailParts);
                     } else {
                         // 商品名から重量を推定
                         const weightMatch = productName?.match(/(\d+)g/);
@@ -744,11 +747,14 @@
                         
                         masterInfo.colorSets.forEach(set => {
                             unitTotalWeight += set.weight * set.quantity;
-                            detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                            detailParts.push({
+                                color: set.color,
+                                detail: `${set.weight}g×${set.quantity}`
+                            });
                         });
                         
                         weight = unitTotalWeight * quantity;
-                        productDetail = detailParts.join(', ');
+                        productDetail = formatColorDetails(detailParts);
                     } else {
                         const weightMatch = itemName?.match(/(\d+)g/);
                         if (weightMatch) {
@@ -850,12 +856,15 @@
                                 
                                 masterInfo.colorSets.forEach(set => {
                                     itemUnitWeight += set.weight * set.quantity;
-                                    itemDetailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                                    itemDetailParts.push({
+                                        color: set.color,
+                                        detail: `${set.weight}g×${set.quantity}`
+                                    });
                                 });
                                 
                                 const itemTotalWeight = itemUnitWeight * quantity;
                                 totalWeight += itemTotalWeight;
-                                productDetails.push(itemDetailParts.join(', '));
+                                productDetails.push(formatColorDetails(itemDetailParts));
                                 totalQuantity += quantity;
                             } else {
                                 console.log(`Product not found in master: ${cleanItemCode}`);
@@ -885,11 +894,14 @@
                             
                             masterInfo.colorSets.forEach(set => {
                                 unitTotalWeight += set.weight * set.quantity;
-                                detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                                detailParts.push({
+                                    color: set.color,
+                                    detail: `${set.weight}g×${set.quantity}`
+                                });
                             });
                             
                             totalWeight = unitTotalWeight * quantity;
-                            productDetails.push(detailParts.join(', '));
+                            productDetails.push(formatColorDetails(detailParts));
                         } else {
                             console.log(`Product not found in master: ${cleanItemCode}`);
                             // 商品マスタにない場合、タイトルから重量推定
@@ -919,6 +931,26 @@
             
             console.log('Yahoo orders processed:', orders.length);
             return orders;
+        }
+
+        function formatColorDetails(detailParts) {
+            if (!detailParts || detailParts.length === 0) return '';
+            
+            const result = [];
+            let currentColor = '';
+            
+            detailParts.forEach((part, index) => {
+                if (part.color !== currentColor) {
+                    // 色が変わった場合は色名を含める
+                    result.push(`${part.color}: ${part.detail}`);
+                    currentColor = part.color;
+                } else {
+                    // 同じ色の場合は詳細のみ
+                    result.push(part.detail);
+                }
+            });
+            
+            return result.join(', ');
         }
 
         function mergeOrdersByRecipient(orders) {
