@@ -413,7 +413,52 @@
                 for (const sheetName of workbook.SheetNames) {
                     if (sheetName.includes('商品マスタ') || sheetName.includes('master') || sheetName.includes('Master')) {
                         masterSheet = workbook.Sheets[sheetName];
-                        console.log('Found master sheet:', sheetName);
+                        console.log(`Yahoo single item: ${itemId} -> ${cleanItemCode}`);
+                        const masterInfo = productMaster[cleanItemCode];
+                        console.log(`Searching for ${cleanItemCode}:`, masterInfo);
+                        
+                        if (masterInfo && masterInfo.colorSets) {
+                            // 複数カラーセット対応
+                            let unitTotalWeight = 0;
+                            const detailParts = [];
+                            
+                            masterInfo.colorSets.forEach(set => {
+                                unitTotalWeight += set.weight * set.quantity;
+                                detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                            });
+                            
+                            totalWeight = unitTotalWeight * quantity;
+                            productDetails.push(detailParts.join(', '));
+                        } else {
+                            console.log(`Product not found in master: ${cleanItemCode}`);
+                            // 商品マスタにない場合、タイトルから重量推定
+                            const weightMatch = title?.match(/(\d+)g/);
+                            totalWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
+                            productDetails.push(`不明商品: ${cleanItemCode}`);
+                        }
+                        totalQuantity = quantity;
+                    }
+
+                    orders.push({
+                        source: 'Yahoo',
+                        sku: itemId,
+                        productName: productDetails.join(', '),
+                        quantity: totalQuantity,
+                        recipientName: shipName,
+                        shipAddress: shipAddress,
+                        zipCode: formatZipCode(shipZip),
+                        phoneNumber: shipPhone,
+                        weight: totalWeight,
+                        orderId: orderId
+                    });
+                } catch (error) {
+                    console.error(`Yahoo row ${index} error:`, error);
+                }
+            });
+            
+            console.log('Yahoo orders processed:', orders.length);
+            return orders;
+        }.log('Found master sheet:', sheetName);
                         break;
                     }
                 }
@@ -707,6 +752,13 @@
                     const shipZip2 = row['送付先郵便番号2']?.trim() || '';
                     const zipCode = formatZipCode(`${shipZip1}${shipZip2}`);
                     
+                    // 楽天住所フィールドの詳細ログ
+                    console.log(`\nRakuten row ${index} address fields:`);
+                    console.log(`  都道府県: "${row['送付先住所都道府県'] || ''}"`);
+                    console.log(`  郡市区: "${row['送付先住所郡市区'] || ''}"`);
+                    console.log(`  それ以降: "${row['送付先住所それ以降の住所'] || ''}"`);
+                    console.log(`  アパート: "${row['送付先住所アパートマンション名'] || ''}"`);
+                    
                     const shipPref = row['送付先住所都道府県']?.trim() || '';
                     const shipCity = row['送付先住所郡市区']?.trim() || '';
                     const shipAddr = row['送付先住所それ以降の住所']?.trim() || '';
@@ -716,8 +768,13 @@
                     const fullAddress = [shipPref, shipCity, shipAddr, shipApart]
                         .filter(addr => addr && addr.trim())
                         .join('');
+                    
+                    console.log(`  Combined address: "${fullAddress}"`);
 
-                    if (!shipName || !fullAddress || !zipCode || !phoneNumber || !orderId) return;
+                    if (!shipName || !fullAddress || !zipCode || !phoneNumber || !orderId) {
+                        console.log(`  Skipping row ${index}: missing required fields`);
+                        return;
+                    }
 
                     // 商品マスタから重量取得（複数カラーセット対応）
                     const masterInfo = productMaster[itemId];
@@ -784,6 +841,15 @@
                     const title = row['Title']?.trim();
                     const quantityDetail = row['QuantityDetail']?.trim();
                     const shipName = row['ShipName']?.trim();
+                    
+                    // Yahoo住所フィールドの詳細ログ
+                    console.log(`\nYahoo row ${index} address fields:`);
+                    console.log(`  ShipAddressFull: "${row['ShipAddressFull'] || ''}"`);
+                    console.log(`  ShipAddress1: "${row['ShipAddress1'] || ''}"`);
+                    console.log(`  ShipAddress2: "${row['ShipAddress2'] || ''}"`);
+                    console.log(`  ShipCity: "${row['ShipCity'] || ''}"`);
+                    console.log(`  ShipPrefecture: "${row['ShipPrefecture'] || ''}"`);
+                    
                     const shipAddress1 = row['ShipAddress1']?.trim() || '';
                     const shipAddress2 = row['ShipAddress2']?.trim() || '';
                     const shipCity = row['ShipCity']?.trim() || '';
@@ -796,10 +862,15 @@
                             .filter(addr => addr && addr.trim())
                             .join('');
                     
+                    console.log(`  Combined address: "${shipAddress}"`);
+                    
                     const shipZip = row['ShipZipCode']?.toString().trim();
                     const shipPhone = formatPhoneNumber(row['ShipPhoneNumber']?.toString().trim());
 
-                    if (!shipName || !shipAddress || !shipZip || !shipPhone || !orderId) return;
+                    if (!shipName || !shipAddress || !shipZip || !shipPhone || !orderId) {
+                        console.log(`  Skipping row ${index}: missing required fields`);
+                        return;
+                    }
 
                     // Yahoo商品IDの処理
                     let totalWeight = 0;
@@ -864,6 +935,49 @@
                         console.log(`Yahoo single item: ${itemId} -> ${cleanItemCode}`);
                         const masterInfo = productMaster[cleanItemCode];
                         console.log(`Searching for ${cleanItemCode}:`, masterInfo);
+                        
+                        if (masterInfo && masterInfo.colorSets) {
+                            // 複数カラーセット対応
+                            let unitTotalWeight = 0;
+                            const detailParts = [];
+                            
+                            masterInfo.colorSets.forEach(set => {
+                                unitTotalWeight += set.weight * set.quantity;
+                                detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                            });
+                            
+                            totalWeight = unitTotalWeight * quantity;
+                            productDetails.push(detailParts.join(', '));
+                        } else {
+                            console.log(`Product not found in master: ${cleanItemCode}`);
+                            // 商品マスタにない場合、タイトルから重量推定
+                            const weightMatch = title?.match(/(\d+)g/);
+                            totalWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
+                            productDetails.push(`不明商品: ${cleanItemCode}`);
+                        }
+                        totalQuantity = quantity;
+                    }
+
+                    orders.push({
+                        source: 'Yahoo',
+                        sku: itemId,
+                        productName: productDetails.join(', '),
+                        quantity: totalQuantity,
+                        recipientName: shipName,
+                        shipAddress: shipAddress,
+                        zipCode: formatZipCode(shipZip),
+                        phoneNumber: shipPhone,
+                        weight: totalWeight,
+                        orderId: orderId
+                    });
+                } catch (error) {
+                    console.error(`Yahoo row ${index} error:`, error);
+                }
+            });
+            
+            console.log('Yahoo orders processed:', orders.length);
+            return orders;
+        }.log(`Searching for ${cleanItemCode}:`, masterInfo);
                         
                         if (masterInfo && masterInfo.colorSets) {
                             // 複数カラーセット対応
