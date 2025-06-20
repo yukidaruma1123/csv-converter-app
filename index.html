@@ -710,7 +710,12 @@
                     const shipPref = row['送付先住所都道府県']?.trim() || '';
                     const shipCity = row['送付先住所郡市区']?.trim() || '';
                     const shipAddr = row['送付先住所それ以降の住所']?.trim() || '';
-                    const fullAddress = `${shipPref}${shipCity}${shipAddr}`;
+                    const shipApart = row['送付先住所アパートマンション名']?.trim() || '';
+                    
+                    // 楽天住所の完全な結合
+                    const fullAddress = [shipPref, shipCity, shipAddr, shipApart]
+                        .filter(addr => addr && addr.trim())
+                        .join('');
 
                     if (!shipName || !fullAddress || !zipCode || !phoneNumber || !orderId) return;
 
@@ -779,7 +784,18 @@
                     const title = row['Title']?.trim();
                     const quantityDetail = row['QuantityDetail']?.trim();
                     const shipName = row['ShipName']?.trim();
-                    const shipAddress = row['ShipAddressFull']?.trim();
+                    const shipAddress1 = row['ShipAddress1']?.trim() || '';
+                    const shipAddress2 = row['ShipAddress2']?.trim() || '';
+                    const shipCity = row['ShipCity']?.trim() || '';
+                    const shipPrefecture = row['ShipPrefecture']?.trim() || '';
+                    const shipAddressFull = row['ShipAddressFull']?.trim() || '';
+                    
+                    // Yahoo住所: ShipAddressFullを優先、なければ個別フィールドを結合
+                    const shipAddress = shipAddressFull || 
+                        [shipPrefecture, shipCity, shipAddress1, shipAddress2]
+                            .filter(addr => addr && addr.trim())
+                            .join('');
+                    
                     const shipZip = row['ShipZipCode']?.toString().trim();
                     const shipPhone = formatPhoneNumber(row['ShipPhoneNumber']?.toString().trim());
 
