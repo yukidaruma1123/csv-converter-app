@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CSV統合変換システム - ヤマト運輸データ作成</title>
+    <meta name="description" content="Amazon・楽天・Yahoo のCSVデータをヤマト運輸用CSVに変換するWebアプリケーション">
     <style>
         * {
             margin: 0;
@@ -84,12 +85,12 @@
         }
 
         .file-input:hover {
-            border-color: #667eea;
+            border-color: #007bff;
             background: #edf2f7;
         }
 
         .file-input.has-file {
-            border-color: #48bb78;
+            border-color: #28a745;
             background: #f0fff4;
             border-style: solid;
         }
@@ -101,7 +102,7 @@
         }
 
         .file-status.success {
-            color: #48bb78;
+            color: #28a745;
         }
 
         .convert-button {
@@ -648,14 +649,11 @@
                         
                         masterInfo.colorSets.forEach(set => {
                             unitTotalWeight += set.weight * set.quantity;
-                            detailParts.push({
-                                color: set.color,
-                                detail: `${set.weight}g×${set.quantity}`
-                            });
+                            detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
                         });
                         
                         weight = unitTotalWeight * quantity;
-                        productDetail = formatColorDetails(detailParts);
+                        productDetail = detailParts.join(', ');
                     } else {
                         // 商品名から重量を推定
                         const weightMatch = productName?.match(/(\d+)g/);
@@ -746,14 +744,11 @@
                         
                         masterInfo.colorSets.forEach(set => {
                             unitTotalWeight += set.weight * set.quantity;
-                            detailParts.push({
-                                color: set.color,
-                                detail: `${set.weight}g×${set.quantity}`
-                            });
+                            detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
                         });
                         
                         weight = unitTotalWeight * quantity;
-                        productDetail = formatColorDetails(detailParts);
+                        productDetail = detailParts.join(', ');
                     } else {
                         const weightMatch = itemName?.match(/(\d+)g/);
                         if (weightMatch) {
@@ -855,15 +850,12 @@
                                 
                                 masterInfo.colorSets.forEach(set => {
                                     itemUnitWeight += set.weight * set.quantity;
-                                    itemDetailParts.push({
-                                        color: set.color,
-                                        detail: `${set.weight}g×${set.quantity}`
-                                    });
+                                    itemDetailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
                                 });
                                 
                                 const itemTotalWeight = itemUnitWeight * quantity;
                                 totalWeight += itemTotalWeight;
-                                productDetails.push(formatColorDetails(itemDetailParts));
+                                productDetails.push(itemDetailParts.join(', '));
                                 totalQuantity += quantity;
                             } else {
                                 console.log(`Product not found in master: ${cleanItemCode}`);
@@ -893,14 +885,11 @@
                             
                             masterInfo.colorSets.forEach(set => {
                                 unitTotalWeight += set.weight * set.quantity;
-                                detailParts.push({
-                                    color: set.color,
-                                    detail: `${set.weight}g×${set.quantity}`
-                                });
+                                detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
                             });
                             
                             totalWeight = unitTotalWeight * quantity;
-                            productDetails.push(formatColorDetails(detailParts));
+                            productDetails.push(detailParts.join(', '));
                         } else {
                             console.log(`Product not found in master: ${cleanItemCode}`);
                             // 商品マスタにない場合、タイトルから重量推定
@@ -930,26 +919,6 @@
             
             console.log('Yahoo orders processed:', orders.length);
             return orders;
-        }
-
-        function formatColorDetails(detailParts) {
-            if (!detailParts || detailParts.length === 0) return '';
-            
-            const result = [];
-            let currentColor = '';
-            
-            detailParts.forEach((part, index) => {
-                if (part.color !== currentColor) {
-                    // 色が変わった場合は色名を含める
-                    result.push(`${part.color}: ${part.detail}`);
-                    currentColor = part.color;
-                } else {
-                    // 同じ色の場合は詳細のみ
-                    result.push(part.detail);
-                }
-            });
-            
-            return result.join(', ');
         }
 
         function mergeOrdersByRecipient(orders) {
@@ -1128,7 +1097,7 @@
                 setTimeout(() => URL.revokeObjectURL(url), 100);
                 
                 downloadButton.textContent = '✅ ダウンロード完了！';
-                downloadButton.style.background = '#38a169';
+                downloadButton.style.background = '#218838';
                 
             } catch (error) {
                 console.error('ダウンロードエラー:', error);
@@ -1201,7 +1170,7 @@
             resultSection.style.display = 'none';
             
             downloadButton.textContent = 'ヤマト運輸用CSVをダウンロード';
-            downloadButton.style.background = '#48bb78';
+            downloadButton.style.background = '#28a745';
             
             updateConvertButton();
         });
