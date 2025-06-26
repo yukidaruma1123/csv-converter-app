@@ -414,7 +414,54 @@
             }
         }
 
-        // 色名を一文字に変換する関数
+        // 特殊色の場合にSubCodeやSKUからカラーオモリ対応表を検索する関数
+        function findSpecialColorInfo(sku, productName) {
+            // SKU情報からカラー情報を抽出（例: "カラー:rain60" から "rain60" を抽出）
+            let colorCode = '';
+            
+            // パターン1: カラー:以降の情報を抽出
+            const colorMatch = productName?.match(/カラー[:：]([^,，\s]+)/i);
+            if (colorMatch) {
+                colorCode = colorMatch[1].trim();
+            }
+            
+            // パターン2: SKUから直接抽出（例: "E6-0CH8-6Q1F" のような場合）
+            if (!colorCode && sku) {
+                // SKUの一部がカラーオモリ対応表にある可能性をチェック
+                for (const [productCode, info] of Object.entries(colorWeightMap)) {
+                    if (sku.toLowerCase().includes(productCode.toLowerCase()) || 
+                        productCode.toLowerCase().includes(sku.toLowerCase())) {
+                        return info;
+                    }
+                }
+            }
+            
+            // パターン3: 商品名から色コードを推測
+            if (!colorCode && productName) {
+                // 商品名に含まれる可能性のある色コードを検索
+                for (const productCode of Object.keys(colorWeightMap)) {
+                    if (productName.toLowerCase().includes(productCode.toLowerCase())) {
+                        colorCode = productCode;
+                        break;
+                    }
+                }
+            }
+            
+            // SubCode（=以降）から抽出する場合の処理も追加
+            if (!colorCode && productName) {
+                const subCodeMatch = productName.match(/=([^&\s,，]+)/);
+                if (subCodeMatch) {
+                    colorCode = subCodeMatch[1].trim();
+                }
+            }
+            
+            // カラーオモリ対応表から検索
+            if (colorCode && colorWeightMap[colorCode]) {
+                return colorWeightMap[colorCode];
+            }
+            
+            return null;
+        }
         function getColorAbbreviation(color) {
             if (!color) return '';
             
@@ -789,7 +836,18 @@
                         
                         masterInfo.colorSets.forEach(set => {
                             unitTotalWeight += set.weight * set.quantity;
-                            const colorAbbr = getColorAbbreviation(set.color);
+                            let colorAbbr = getColorAbbreviation(set.color);
+                            
+                            // 色が「特殊」の場合は、SubCodeやSKU情報からカラーオモリ対応表を検索
+                            if (set.color === '特殊' || colorAbbr === '特') {
+                                const specialColorInfo = findSpecialColorInfo(sku, productName);
+                                if (specialColorInfo) {
+                                    colorAbbr = getColorAbbreviation(specialColorInfo.color);
+                                    // 特殊色の重量を使用（商品マスタの重量は無視）
+                                    unitTotalWeight = unitTotalWeight - set.weight * set.quantity + specialColorInfo.weight * set.quantity;
+                                }
+                            }
+                            
                             detailParts.push(`${colorAbbr}: ${set.weight}g×${set.quantity}`);
                         });
                         
@@ -893,7 +951,18 @@
                         
                         masterInfo.colorSets.forEach(set => {
                             unitTotalWeight += set.weight * set.quantity;
-                            const colorAbbr = getColorAbbreviation(set.color);
+                            let colorAbbr = getColorAbbreviation(set.color);
+                            
+                            // 色が「特殊」の場合は、SubCodeやSKU情報からカラーオモリ対応表を検索
+                            if (set.color === '特殊' || colorAbbr === '特') {
+                                const specialColorInfo = findSpecialColorInfo(itemId, itemName);
+                                if (specialColorInfo) {
+                                    colorAbbr = getColorAbbreviation(specialColorInfo.color);
+                                    // 特殊色の重量を使用（商品マスタの重量は無視）
+                                    unitTotalWeight = unitTotalWeight - set.weight * set.quantity + specialColorInfo.weight * set.quantity;
+                                }
+                            }
+                            
                             detailParts.push(`${colorAbbr}: ${set.weight}g×${set.quantity}`);
                         });
                         
@@ -1008,7 +1077,18 @@
                                 
                                 masterInfo.colorSets.forEach(set => {
                                     itemUnitWeight += set.weight * set.quantity;
-                                    const colorAbbr = getColorAbbreviation(set.color);
+                                    let colorAbbr = getColorAbbreviation(set.color);
+                                    
+                                    // 色が「特殊」の場合は、SubCodeやSKU情報からカラーオモリ対応表を検索
+                                    if (set.color === '特殊' || colorAbbr === '特') {
+                                        const specialColorInfo = findSpecialColorInfo(cleanItemCode, title);
+                                        if (specialColorInfo) {
+                                            colorAbbr = getColorAbbreviation(specialColorInfo.color);
+                                            // 特殊色の重量を使用（商品マスタの重量は無視）
+                                            itemUnitWeight = itemUnitWeight - set.weight * set.quantity + specialColorInfo.weight * set.quantity;
+                                        }
+                                    }
+                                    
                                     itemDetailParts.push(`${colorAbbr}: ${set.weight}g×${set.quantity}`);
                                 });
                                 
@@ -1053,7 +1133,18 @@
                             
                             masterInfo.colorSets.forEach(set => {
                                 unitTotalWeight += set.weight * set.quantity;
-                                const colorAbbr = getColorAbbreviation(set.color);
+                                let colorAbbr = getColorAbbreviation(set.color);
+                                
+                                // 色が「特殊」の場合は、SubCodeやSKU情報からカラーオモリ対応表を検索
+                                if (set.color === '特殊' || colorAbbr === '特') {
+                                    const specialColorInfo = findSpecialColorInfo(cleanItemCode, title);
+                                    if (specialColorInfo) {
+                                        colorAbbr = getColorAbbreviation(specialColorInfo.color);
+                                        // 特殊色の重量を使用（商品マスタの重量は無視）
+                                        unitTotalWeight = unitTotalWeight - set.weight * set.quantity + specialColorInfo.weight * set.quantity;
+                                    }
+                                }
+                                
                                 detailParts.push(`${colorAbbr}: ${set.weight}g×${set.quantity}`);
                             });
                             
