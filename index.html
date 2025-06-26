@@ -418,23 +418,30 @@
         function findSpecialColorInfo(productId, subCodeOrSku, dataSource) {
             let colorCode = '';
             
+            console.log(`特殊色検索開始 - データソース: ${dataSource}, 商品ID: ${productId}, SubCode/SKU: ${subCodeOrSku}`);
+            
             if (dataSource === 'Yahoo') {
                 // Yahoo: SubCode(=以降)から抽出
                 if (subCodeOrSku && subCodeOrSku.includes('=')) {
                     colorCode = subCodeOrSku.split('=')[1];
+                    console.log(`Yahoo SubCode抽出: ${colorCode}`);
                 }
             } else if (dataSource === 'Rakuten') {
                 // 楽天: SKU情報(:以降)から抽出
                 if (subCodeOrSku && subCodeOrSku.includes(':')) {
                     colorCode = subCodeOrSku.split(':')[1];
+                    console.log(`楽天 SKU抽出: ${colorCode}`);
                 }
             }
             
             // カラーオモリ対応表から検索
+            console.log(`カラーオモリ対応表で検索: ${colorCode}`);
             if (colorCode && colorWeightMap[colorCode]) {
+                console.log(`カラーオモリ対応表で見つかった: ${colorWeightMap[colorCode].color}, ${colorWeightMap[colorCode].weight}g`);
                 return colorWeightMap[colorCode];
             }
             
+            console.log(`カラーオモリ対応表で見つからなかった: ${colorCode}`);
             return null;
         }
         function getColorAbbreviation(color) {
@@ -926,14 +933,20 @@
                             let colorAbbr = getColorAbbreviation(set.color);
                             let actualWeight = set.weight;
                             
+                            console.log(`楽天 - 商品ID: ${itemId}, 色: ${set.color}, 特殊チェック: ${set.color.includes('特殊')}`);
+                            
                             // 色に「特殊」が含まれている場合は、SKU情報からカラーオモリ対応表を検索
                             if (set.color.includes('特殊')) {
+                                console.log(`楽天 - 特殊色検出: ${set.color}, SKU: ${skuCode}`);
                                 const specialColorInfo = findSpecialColorInfo(itemId, skuCode, '楽天');
                                 if (specialColorInfo) {
+                                    console.log(`楽天 - 特殊色情報見つかった: ${specialColorInfo.color}, ${specialColorInfo.weight}g`);
                                     colorAbbr = getColorAbbreviation(specialColorInfo.color);
                                     actualWeight = specialColorInfo.weight;
                                     // 重量を特殊色の重量に置き換え
                                     unitTotalWeight = unitTotalWeight - set.weight * set.quantity + actualWeight * set.quantity;
+                                } else {
+                                    console.log(`楽天 - 特殊色情報が見つからない: ${itemId}, ${skuCode}`);
                                 }
                             }
                             
@@ -1054,14 +1067,20 @@
                                     let colorAbbr = getColorAbbreviation(set.color);
                                     let actualWeight = set.weight;
                                     
+                                    console.log(`Yahoo複数 - 商品ID: ${cleanItemCode}, 色: ${set.color}, 特殊チェック: ${set.color.includes('特殊')}`);
+                                    
                                     // 色に「特殊」が含まれている場合は、SubCode情報からカラーオモリ対応表を検索
                                     if (set.color.includes('特殊')) {
+                                        console.log(`Yahoo複数 - 特殊色検出: ${set.color}, SubCode: ${item}`);
                                         const specialColorInfo = findSpecialColorInfo(cleanItemCode, item, 'Yahoo');
                                         if (specialColorInfo) {
+                                            console.log(`Yahoo複数 - 特殊色情報見つかった: ${specialColorInfo.color}, ${specialColorInfo.weight}g`);
                                             colorAbbr = getColorAbbreviation(specialColorInfo.color);
                                             actualWeight = specialColorInfo.weight;
                                             // 重量を特殊色の重量に置き換え
                                             itemUnitWeight = itemUnitWeight - set.weight * set.quantity + actualWeight * set.quantity;
+                                        } else {
+                                            console.log(`Yahoo複数 - 特殊色情報が見つからない: ${cleanItemCode}, ${item}`);
                                         }
                                     }
                                     
@@ -1112,14 +1131,20 @@
                                 let colorAbbr = getColorAbbreviation(set.color);
                                 let actualWeight = set.weight;
                                 
+                                console.log(`Yahoo単一 - 商品ID: ${cleanItemCode}, 色: ${set.color}, 特殊チェック: ${set.color.includes('特殊')}`);
+                                
                                 // 色に「特殊」が含まれている場合は、SubCode情報からカラーオモリ対応表を検索
                                 if (set.color.includes('特殊')) {
+                                    console.log(`Yahoo単一 - 特殊色検出: ${set.color}, SubCode: ${itemId}`);
                                     const specialColorInfo = findSpecialColorInfo(cleanItemCode, itemId, 'Yahoo');
                                     if (specialColorInfo) {
+                                        console.log(`Yahoo単一 - 特殊色情報見つかった: ${specialColorInfo.color}, ${specialColorInfo.weight}g`);
                                         colorAbbr = getColorAbbreviation(specialColorInfo.color);
                                         actualWeight = specialColorInfo.weight;
                                         // 重量を特殊色の重量に置き換え
                                         unitTotalWeight = unitTotalWeight - set.weight * set.quantity + actualWeight * set.quantity;
+                                    } else {
+                                        console.log(`Yahoo単一 - 特殊色情報が見つからない: ${cleanItemCode}, ${itemId}`);
                                     }
                                 }
                                 
