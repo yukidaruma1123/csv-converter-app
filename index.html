@@ -389,21 +389,25 @@
                 console.log('Headers:', jsonData[0]);
                 
                 // カラーオモリ対応表オブジェクトを構築
-                // A列: カラー名、B列: Yahoo表記、C列: 楽天表記、D列: 重量(g)
+                // A列: 空、B列: Yahoo表記、C列: 楽天表記、D列: 色、E列: 重さ
                 colorWeightTable = {
                     byYahoo: {},  // B列(Yahoo表記)でのマッピング
                     byRakuten: {}, // C列(楽天表記)でのマッピング
-                    byColor: {}    // A列(カラー名)でのマッピング（従来互換用）
+                    byColor: {}    // D列(色)でのマッピング（従来互換用）
                 };
                 let loadedCount = 0;
                 
                 for (let i = 1; i < jsonData.length; i++) {
                     const row = jsonData[i];
-                    if (row.length >= 4) {
-                        const colorName = String(row[0] || '').trim();
-                        const yahooCode = String(row[1] || '').trim();
-                        const rakutenCode = String(row[2] || '').trim();
-                        const weight = parseFloat(row[3]) || 0;
+                    if (row.length >= 5) {
+                        const yahooCode = String(row[1] || '').trim();     // B列: Yahoo表記
+                        const rakutenCode = String(row[2] || '').trim();   // C列: 楽天表記
+                        const colorName = String(row[3] || '').trim();     // D列: 色
+                        const weightStr = String(row[4] || '').trim();     // E列: 重さ("60g", "80g"形式)
+                        
+                        // 重さから数値を抽出
+                        const weightMatch = weightStr.match(/(\d+)/);
+                        const weight = weightMatch ? parseFloat(weightMatch[1]) : 0;
                         
                         if (weight > 0) {
                             // Yahoo表記でのマッピング（B列）
@@ -412,6 +416,7 @@
                                     color: colorName,
                                     weight: weight
                                 };
+                                console.log(`Yahoo mapping: ${yahooCode} -> ${colorName}: ${weight}g`);
                             }
                             
                             // 楽天表記でのマッピング（C列）
@@ -420,9 +425,10 @@
                                     color: colorName,
                                     weight: weight
                                 };
+                                console.log(`Rakuten mapping: ${rakutenCode} -> ${colorName}: ${weight}g`);
                             }
                             
-                            // カラー名でのマッピング（A列・従来互換用）
+                            // カラー名でのマッピング（D列・従来互換用）
                             if (colorName) {
                                 colorWeightTable.byColor[colorName] = weight;
                             }
