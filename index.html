@@ -410,22 +410,28 @@
                         const weight = weightMatch ? parseFloat(weightMatch[1]) : 0;
                         
                         if (weight > 0) {
+                            // 色を一文字に変換
+                            let shortColor = colorName;
+                            if (colorName.endsWith('色')) {
+                                shortColor = colorName.slice(0, -1); // 最後の「色」を除去
+                            }
+                            
                             // Yahoo表記でのマッピング（B列）
                             if (yahooCode) {
                                 colorWeightTable.byYahoo[yahooCode] = {
-                                    color: colorName,
+                                    color: shortColor,
                                     weight: weight
                                 };
-                                console.log(`Yahoo mapping: ${yahooCode} -> ${colorName}: ${weight}g`);
+                                console.log(`Yahoo mapping: ${yahooCode} -> ${shortColor}: ${weight}g`);
                             }
                             
                             // 楽天表記でのマッピング（C列）
                             if (rakutenCode) {
                                 colorWeightTable.byRakuten[rakutenCode] = {
-                                    color: colorName,
+                                    color: shortColor,
                                     weight: weight
                                 };
-                                console.log(`Rakuten mapping: ${rakutenCode} -> ${colorName}: ${weight}g`);
+                                console.log(`Rakuten mapping: ${rakutenCode} -> ${shortColor}: ${weight}g`);
                             }
                             
                             // カラー名でのマッピング（D列・従来互換用）
