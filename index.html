@@ -678,17 +678,33 @@
                     try {
                         const buffer = new Uint8Array(e.target.result);
                         
-                        // UTF-8で試行
+                        // ファイル名で判定してエンコーディングを選択
                         let result;
-                        try {
-                            result = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
-                        } catch {
-                            // Shift-JISで試行
+                        if (file.name.includes('楽天') || file.name.includes('rakuten')) {
+                            // 楽天データはShift-JISを優先
                             try {
                                 result = new TextDecoder('shift-jis', { fatal: false }).decode(buffer);
+                                console.log('Used Shift-JIS encoding for Rakuten data');
                             } catch {
-                                // 最後の手段：非厳密なUTF-8
+                                // Shift-JISでダメならUTF-8を試行
                                 result = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+                                console.log('Fallback to UTF-8 for Rakuten data');
+                            }
+                        } else {
+                            // その他のファイルはUTF-8を優先
+                            try {
+                                result = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+                                console.log('Used UTF-8 encoding');
+                            } catch {
+                                // UTF-8でダメならShift-JISを試行
+                                try {
+                                    result = new TextDecoder('shift-jis', { fatal: false }).decode(buffer);
+                                    console.log('Fallback to Shift-JIS');
+                                } catch {
+                                    // 最後の手段：非厳密なUTF-8
+                                    result = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+                                    console.log('Used non-strict UTF-8 as last resort');
+                                }
                             }
                         }
                         
@@ -839,14 +855,48 @@
                     let productDetail = itemName;
 
                     // 1. まずSKU情報（FB列）からカラーオモリ対応表を検索
-                    if (skuInfo && colorWeightTable.byRakuten && colorWeightTable.byRakuten[skuInfo]) {
-                        const colorInfo = colorWeightTable.byRakuten[skuInfo];
-                        weight = colorInfo.weight * quantity;
-                        productDetail = `${colorInfo.color}: ${colorInfo.weight}g×${quantity}`;
-                        console.log(`Rakuten SKU match: ${skuInfo} -> ${colorInfo.color}: ${colorInfo.weight}g`);
+                    if (skuInfo && colorWeightTable.byRakuten) {
+                        // SKU情報から"カラー:"プレフィックスを除去
+                        let cleanSKU = skuInfo;
+                        if (skuInfo.startsWith('カラー:')) {
+                            cleanSKU = skuInfo.substring(3); // "カラー:"を除去
+                        }
+                        
+                        console.log(`Rakuten SKU processing: "${skuInfo}" -> "${cleanSKU}"`);
+                        
+                        if (colorWeightTable.byRakuten[cleanSKU]) {
+                            const colorInfo = colorWeightTable.byRakuten[cleanSKU];
+                            weight = colorInfo.weight * quantity;
+                            productDetail = `${colorInfo.color}: ${colorInfo.weight}g×${quantity}`;
+                            console.log(`Rakuten SKU match: ${cleanSKU} -> ${colorInfo.color}: ${colorInfo.weight}g`);
+                        } else {
+                            console.log(`Rakuten SKU not found in table: "${cleanSKU}"`);
+                            // SKU情報があるが対応表にない場合は従来の処理へ
+                            const masterInfo = productMaster[itemId];
+                            if (masterInfo && masterInfo.colorSets) {
+                                // 複数カラーセット対応
+                                let unitTotalWeight = 0;
+                                const detailParts = [];
+                                
+                                masterInfo.colorSets.forEach(set => {
+                                    unitTotalWeight += set.weight * set.quantity;
+                                    detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                                });
+                                
+                                weight = unitTotalWeight * quantity;
+                                productDetail = detailParts.join(', ');
+                            } else {
+                                // 商品名から重量推定（最後の手段）
+                                const weightMatch = itemName?.match(/(\d+)g/);
+                                if (weightMatch) {
+                                    weight = parseInt(weightMatch[1]) * quantity;
+                                }
+                            }
+                        }
                     }
                     // 2. SKU情報がない場合、従来通り商品管理番号で商品マスタを確認
                     else {
+                        console.log(`No Rakuten SKU info, using itemId: ${itemId}`);
                         const masterInfo = productMaster[itemId];
                         if (masterInfo && masterInfo.colorSets) {
                             // 複数カラーセット対応
