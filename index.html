@@ -367,7 +367,7 @@
         async function loadColorWeightTable() {
             try {
                 console.log('Loading color weight table...');
-                const response = await fetch('./カラーオモリ対応表1.xlsx');
+                const response = await fetch('./カラーオモリ対応表.xlsx');
                 if (!response.ok) {
                     throw new Error(`カラーオモリ対応表の読み込みに失敗しました: ${response.status}`);
                 }
@@ -389,23 +389,52 @@
                 console.log('Headers:', jsonData[0]);
                 
                 // カラーオモリ対応表オブジェクトを構築
-                colorWeightTable = {};
+                // A列: カラー名、B列: Yahoo表記、C列: 楽天表記、D列: 重量(g)
+                colorWeightTable = {
+                    byYahoo: {},  // B列(Yahoo表記)でのマッピング
+                    byRakuten: {}, // C列(楽天表記)でのマッピング
+                    byColor: {}    // A列(カラー名)でのマッピング（従来互換用）
+                };
                 let loadedCount = 0;
                 
                 for (let i = 1; i < jsonData.length; i++) {
                     const row = jsonData[i];
-                    if (row.length >= 2 && row[0] && row[1]) {
-                        const color = String(row[0]).trim();
-                        const weight = parseFloat(row[1]) || 0;
+                    if (row.length >= 4) {
+                        const colorName = String(row[0] || '').trim();
+                        const yahooCode = String(row[1] || '').trim();
+                        const rakutenCode = String(row[2] || '').trim();
+                        const weight = parseFloat(row[3]) || 0;
                         
                         if (weight > 0) {
-                            colorWeightTable[color] = weight;
+                            // Yahoo表記でのマッピング（B列）
+                            if (yahooCode) {
+                                colorWeightTable.byYahoo[yahooCode] = {
+                                    color: colorName,
+                                    weight: weight
+                                };
+                            }
+                            
+                            // 楽天表記でのマッピング（C列）
+                            if (rakutenCode) {
+                                colorWeightTable.byRakuten[rakutenCode] = {
+                                    color: colorName,
+                                    weight: weight
+                                };
+                            }
+                            
+                            // カラー名でのマッピング（A列・従来互換用）
+                            if (colorName) {
+                                colorWeightTable.byColor[colorName] = weight;
+                            }
+                            
                             loadedCount++;
                         }
                     }
                 }
                 
                 console.log(`Color weight table loaded: ${loadedCount} colors`);
+                console.log('Yahoo codes:', Object.keys(colorWeightTable.byYahoo));
+                console.log('Rakuten codes:', Object.keys(colorWeightTable.byRakuten));
                 return true;
                 
             } catch (error) {
@@ -519,8 +548,8 @@
                             const color = String(row[colorCol] || '').trim();
                             
                             // カラーオモリ対応表から重量を取得（優先）
-                            if (color && colorWeightTable[color]) {
-                                weight = colorWeightTable[color];
+                            if (color && colorWeightTable.byColor && colorWeightTable.byColor[color]) {
+                                weight = colorWeightTable.byColor[color];
                                 console.log(`Using color weight table: ${color} = ${weight}g`);
                             }
                             
@@ -766,9 +795,9 @@
                 try {
                     const orderId = row['注文番号']?.trim();
                     const itemId = row['商品管理番号']?.trim();
-                    const skuInfo = row['SKU情報']?.trim(); // FB列のSKU情報
                     const itemName = row['商品名']?.trim();
                     const quantity = parseInt(row['個数']) || 1;
+                    const skuInfo = row['SKU情報']?.trim() || ''; // FB列のSKU情報
                     
                     const shipLastName = row['送付先姓']?.trim() || '';
                     const shipFirstName = row['送付先名']?.trim() || '';
@@ -799,18 +828,18 @@
 
                     if (!shipName || !fullAddress || !zipCode || !phoneNumber || !orderId) return;
 
-                    // 重量と商品詳細の計算
+                    // 重量計算の新しいロジック
                     let weight = 50 * quantity; // デフォルト重量×注文数
                     let productDetail = itemName;
 
-                    // 1. 最初にSKU情報でカラーオモリ対応表を検索
-                    if (skuInfo && colorWeightTable[skuInfo]) {
-                        const colorWeight = colorWeightTable[skuInfo];
-                        weight = colorWeight * quantity;
-                        productDetail = `${skuInfo}: ${colorWeight}g`;
-                        console.log(`Rakuten: Found in color table by SKU: ${skuInfo} = ${colorWeight}g`);
+                    // 1. まずSKU情報（FB列）からカラーオモリ対応表を検索
+                    if (skuInfo && colorWeightTable.byRakuten && colorWeightTable.byRakuten[skuInfo]) {
+                        const colorInfo = colorWeightTable.byRakuten[skuInfo];
+                        weight = colorInfo.weight * quantity;
+                        productDetail = `${colorInfo.color}: ${colorInfo.weight}g×${quantity}`;
+                        console.log(`Rakuten SKU match: ${skuInfo} -> ${colorInfo.color}: ${colorInfo.weight}g`);
                     }
-                    // 2. SKU情報がない場合やカラーオモリ対応表にない場合は商品マスタを確認
+                    // 2. SKU情報がない場合、従来通り商品管理番号で商品マスタを確認
                     else {
                         const masterInfo = productMaster[itemId];
                         if (masterInfo && masterInfo.colorSets) {
@@ -819,26 +848,18 @@
                             const detailParts = [];
                             
                             masterInfo.colorSets.forEach(set => {
-                                // カラーオモリ対応表を優先チェック
-                                let colorWeight = set.weight;
-                                if (colorWeightTable[set.color]) {
-                                    colorWeight = colorWeightTable[set.color];
-                                    console.log(`Rakuten: Using color table for ${set.color}: ${colorWeight}g`);
-                                }
-                                
-                                unitTotalWeight += colorWeight * set.quantity;
-                                detailParts.push(`${set.color}: ${colorWeight}g×${set.quantity}`);
+                                unitTotalWeight += set.weight * set.quantity;
+                                detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
                             });
                             
                             weight = unitTotalWeight * quantity;
                             productDetail = detailParts.join(', ');
                         } else {
-                            // 商品名から重量を推定
+                            // 商品名から重量推定（最後の手段）
                             const weightMatch = itemName?.match(/(\d+)g/);
                             if (weightMatch) {
                                 weight = parseInt(weightMatch[1]) * quantity;
                             }
-                            console.log(`Rakuten: Product not found in master or color table: ${itemId}, SKU: ${skuInfo}`);
                         }
                     }
 
@@ -880,7 +901,7 @@
                 try {
                     const orderId = row['OrderId']?.trim();
                     let itemId = row['ItemId']?.trim();
-                    const subCode = row['SubCode']?.trim(); // SubCode列
+                    const subCode = row['SubCode']?.trim() || ''; // SubCode追加
                     const title = row['Title']?.trim();
                     const quantityDetail = row['QuantityDetail']?.trim();
                     const shipName = row['ShipName']?.trim();
@@ -901,22 +922,90 @@
 
                     if (!shipName || !shipAddress || !shipZip || !shipPhone || !orderId) return;
 
-                    // Yahoo商品の重量と詳細計算
+                    // 重量計算の新しいロジック
                     let totalWeight = 0;
                     let productDetails = [];
                     let totalQuantity = 0;
 
-                    // 1. 最初にSubCodeでカラーオモリ対応表を検索
-                    if (subCode && colorWeightTable[subCode]) {
-                        const colorWeight = colorWeightTable[subCode];
-                        const quantity = parseInt(quantityDetail) || 1;
-                        totalWeight = colorWeight * quantity;
-                        productDetails.push(`${subCode}: ${colorWeight}g`);
-                        totalQuantity = quantity;
-                        console.log(`Yahoo: Found in color table by SubCode: ${subCode} = ${colorWeight}g`);
+                    // 1. まずSubCodeからカラーオモリ対応表を検索
+                    if (subCode && colorWeightTable.byYahoo) {
+                        console.log(`Processing Yahoo SubCode: ${subCode}`);
+                        
+                        if (subCode.includes('&')) {
+                            // 複数商品の場合（例: L1=greenmix60&L2=yellowgreen80）
+                            const items = subCode.split('&');
+                            items.forEach(item => {
+                                // L1=greenmix60 -> greenmix60 を抽出
+                                let cleanItemCode = '';
+                                if (item.includes('=')) {
+                                    cleanItemCode = item.split('=')[1]; // = より後ろを取得
+                                } else {
+                                    cleanItemCode = item.trim();
+                                }
+                                
+                                console.log(`Yahoo multiple SubCode item: ${item} -> ${cleanItemCode}`);
+                                
+                                // カラーオモリ対応表から検索
+                                if (colorWeightTable.byYahoo[cleanItemCode]) {
+                                    const colorInfo = colorWeightTable.byYahoo[cleanItemCode];
+                                    
+                                    // QuantityDetailから該当商品の数量を取得（例: greenmix60:2,yellowgreen80:1）
+                                    let quantity = 1;
+                                    if (quantityDetail) {
+                                        const quantityMatch = quantityDetail.match(new RegExp(`${cleanItemCode}:(\\d+)`));
+                                        quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+                                    }
+                                    
+                                    const itemTotalWeight = colorInfo.weight * quantity;
+                                    totalWeight += itemTotalWeight;
+                                    productDetails.push(`${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
+                                    totalQuantity += quantity;
+                                    
+                                    console.log(`Yahoo SubCode match: ${cleanItemCode} -> ${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
+                                } else {
+                                    console.log(`Yahoo SubCode not found in table: ${cleanItemCode}`);
+                                    // 対応表にない場合のフォールバック
+                                    let quantity = 1;
+                                    if (quantityDetail) {
+                                        const quantityMatch = quantityDetail.match(new RegExp(`${cleanItemCode}:(\\d+)`));
+                                        quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+                                    }
+                                    totalWeight += 50 * quantity;
+                                    productDetails.push(`不明商品: ${cleanItemCode}×${quantity}`);
+                                    totalQuantity += quantity;
+                                }
+                            });
+                        } else {
+                            // 単一商品の場合（例: L1=greenmix60）
+                            const quantity = parseInt(quantityDetail) || 1;
+                            
+                            // 単一商品でも = より後ろを取得
+                            let cleanItemCode = subCode;
+                            if (subCode.includes('=')) {
+                                cleanItemCode = subCode.split('=')[1]; // = より後ろを取得
+                            }
+                            
+                            console.log(`Yahoo single SubCode: ${subCode} -> ${cleanItemCode}`);
+                            
+                            if (colorWeightTable.byYahoo[cleanItemCode]) {
+                                const colorInfo = colorWeightTable.byYahoo[cleanItemCode];
+                                totalWeight = colorInfo.weight * quantity;
+                                productDetails.push(`${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
+                                console.log(`Yahoo SubCode match: ${cleanItemCode} -> ${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
+                            } else {
+                                console.log(`Yahoo SubCode not found in table: ${cleanItemCode}`);
+                                // 対応表にない場合のフォールバック
+                                totalWeight = 50 * quantity;
+                                productDetails.push(`不明商品: ${cleanItemCode}×${quantity}`);
+                            }
+                            totalQuantity = quantity;
+                        }
                     }
-                    // 2. SubCodeがない場合やカラーオモリ対応表にない場合は従来のItemId処理
-                    else {
+                    
+                    // 2. SubCodeがない場合、従来通りItemIdで商品マスタを確認
+                    if (totalWeight === 0) {
+                        console.log(`No SubCode or not found, using ItemId: ${itemId}`);
+                        
                         if (itemId?.includes('&')) {
                             // 複数商品の場合（例: L1=bara60&L2=bara80）
                             const items = itemId.split('&');
@@ -938,45 +1027,28 @@
                                     quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
                                 }
                                 
-                                // カラーオモリ対応表を優先チェック
-                                if (colorWeightTable[cleanItemCode]) {
-                                    const colorWeight = colorWeightTable[cleanItemCode];
-                                    totalWeight += colorWeight * quantity;
-                                    productDetails.push(`${cleanItemCode}: ${colorWeight}g`);
-                                    totalQuantity += quantity;
-                                    console.log(`Yahoo: Found in color table: ${cleanItemCode} = ${colorWeight}g`);
-                                } else {
-                                    // 商品マスタから検索
-                                    const masterInfo = productMaster[cleanItemCode];
-                                    console.log(`Searching for ${cleanItemCode}:`, masterInfo);
+                                const masterInfo = productMaster[cleanItemCode];
+                                console.log(`Searching for ${cleanItemCode}:`, masterInfo);
+                                
+                                if (masterInfo && masterInfo.colorSets) {
+                                    // 複数カラーセット対応
+                                    let itemUnitWeight = 0;
+                                    const itemDetailParts = [];
                                     
-                                    if (masterInfo && masterInfo.colorSets) {
-                                        // 複数カラーセット対応
-                                        let itemUnitWeight = 0;
-                                        const itemDetailParts = [];
-                                        
-                                        masterInfo.colorSets.forEach(set => {
-                                            // カラーオモリ対応表を優先チェック
-                                            let colorWeight = set.weight;
-                                            if (colorWeightTable[set.color]) {
-                                                colorWeight = colorWeightTable[set.color];
-                                                console.log(`Yahoo: Using color table for ${set.color}: ${colorWeight}g`);
-                                            }
-                                            
-                                            itemUnitWeight += colorWeight * set.quantity;
-                                            itemDetailParts.push(`${set.color}: ${colorWeight}g×${set.quantity}`);
-                                        });
-                                        
-                                        const itemTotalWeight = itemUnitWeight * quantity;
-                                        totalWeight += itemTotalWeight;
-                                        productDetails.push(itemDetailParts.join(', '));
-                                        totalQuantity += quantity;
-                                    } else {
-                                        console.log(`Product not found in master or color table: ${cleanItemCode}`);
-                                        totalWeight += 50 * quantity;
-                                        productDetails.push(`不明商品: ${cleanItemCode}`);
-                                        totalQuantity += quantity;
-                                    }
+                                    masterInfo.colorSets.forEach(set => {
+                                        itemUnitWeight += set.weight * set.quantity;
+                                        itemDetailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                                    });
+                                    
+                                    const itemTotalWeight = itemUnitWeight * quantity;
+                                    totalWeight += itemTotalWeight;
+                                    productDetails.push(itemDetailParts.join(', '));
+                                    totalQuantity += quantity;
+                                } else {
+                                    console.log(`Product not found in master: ${cleanItemCode}`);
+                                    totalWeight += 50 * quantity;
+                                    productDetails.push(`不明商品: ${cleanItemCode}`);
+                                    totalQuantity += quantity;
                                 }
                             });
                         } else {
@@ -990,44 +1062,27 @@
                             }
                             
                             console.log(`Yahoo single item: ${itemId} -> ${cleanItemCode}`);
+                            const masterInfo = productMaster[cleanItemCode];
+                            console.log(`Searching for ${cleanItemCode}:`, masterInfo);
                             
-                            // カラーオモリ対応表を優先チェック
-                            if (colorWeightTable[cleanItemCode]) {
-                                const colorWeight = colorWeightTable[cleanItemCode];
-                                totalWeight = colorWeight * quantity;
-                                productDetails.push(`${cleanItemCode}: ${colorWeight}g`);
-                                console.log(`Yahoo: Found in color table: ${cleanItemCode} = ${colorWeight}g`);
-                            } else {
-                                // 商品マスタから検索
-                                const masterInfo = productMaster[cleanItemCode];
-                                console.log(`Searching for ${cleanItemCode}:`, masterInfo);
+                            if (masterInfo && masterInfo.colorSets) {
+                                // 複数カラーセット対応
+                                let unitTotalWeight = 0;
+                                const detailParts = [];
                                 
-                                if (masterInfo && masterInfo.colorSets) {
-                                    // 複数カラーセット対応
-                                    let unitTotalWeight = 0;
-                                    const detailParts = [];
-                                    
-                                    masterInfo.colorSets.forEach(set => {
-                                        // カラーオモリ対応表を優先チェック
-                                        let colorWeight = set.weight;
-                                        if (colorWeightTable[set.color]) {
-                                            colorWeight = colorWeightTable[set.color];
-                                            console.log(`Yahoo: Using color table for ${set.color}: ${colorWeight}g`);
-                                        }
-                                        
-                                        unitTotalWeight += colorWeight * set.quantity;
-                                        detailParts.push(`${set.color}: ${colorWeight}g×${set.quantity}`);
-                                    });
-                                    
-                                    totalWeight = unitTotalWeight * quantity;
-                                    productDetails.push(detailParts.join(', '));
-                                } else {
-                                    console.log(`Product not found in master or color table: ${cleanItemCode}`);
-                                    // 商品マスタにない場合、タイトルから重量推定
-                                    const weightMatch = title?.match(/(\d+)g/);
-                                    totalWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
-                                    productDetails.push(`不明商品: ${cleanItemCode}`);
-                                }
+                                masterInfo.colorSets.forEach(set => {
+                                    unitTotalWeight += set.weight * set.quantity;
+                                    detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                                });
+                                
+                                totalWeight = unitTotalWeight * quantity;
+                                productDetails.push(detailParts.join(', '));
+                            } else {
+                                console.log(`Product not found in master: ${cleanItemCode}`);
+                                // 商品マスタにない場合、タイトルから重量推定
+                                const weightMatch = title?.match(/(\d+)g/);
+                                totalWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
+                                productDetails.push(`不明商品: ${cleanItemCode}`);
                             }
                             totalQuantity = quantity;
                         }
