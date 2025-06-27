@@ -859,7 +859,7 @@
                         // SKU情報から"カラー:"プレフィックスを除去
                         let cleanSKU = skuInfo;
                         if (skuInfo.startsWith('カラー:')) {
-                            cleanSKU = skuInfo.substring(3); // "カラー:"を除去
+                            cleanSKU = skuInfo.substring(4); // "カラー:"を除去（4文字）
                         }
                         
                         console.log(`Rakuten SKU processing: "${skuInfo}" -> "${cleanSKU}"`);
