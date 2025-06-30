@@ -369,7 +369,8 @@
                 console.log('Loading color weight table...');
                 const response = await fetch('./カラーオモリ対応表.xlsx');
                 if (!response.ok) {
-                    throw new Error(`カラーオモリ対応表の読み込みに失敗しました: ${response.status}`);
+                    console.warn(`カラーオモリ対応表の読み込みをスキップ: ${response.status}`);
+                    return false;
                 }
                 
                 const arrayBuffer = await response.arrayBuffer();
@@ -450,8 +451,14 @@
                 return true;
                 
             } catch (error) {
-                console.error('カラーオモリ対応表読み込みエラー:', error);
+                console.warn('カラーオモリ対応表読み込みエラー:', error);
+                console.warn('処理を継続します（対応表なしでも動作）');
                 // エラーでも処理を継続（対応表なしでも動作するため）
+                colorWeightTable = {
+                    byYahoo: {},
+                    byRakuten: {},
+                    byColor: {}
+                };
                 return false;
             }
         }
@@ -1573,16 +1580,30 @@
         async function initialize() {
             console.log('Initializing application...');
             
-            // カラーオモリ対応表を自動読み込み
-            const colorTableLoaded = await loadColorWeightTable();
-            
-            if (colorTableLoaded) {
-                console.log('✅ カラーオモリ対応表の読み込み完了');
-            } else {
-                console.log('⚠️ カラーオモリ対応表の読み込みに失敗（処理は継続）');
+            // カラーオモリ対応表を自動読み込み（エラーでも継続）
+            try {
+                const colorTableLoaded = await loadColorWeightTable();
+                
+                if (colorTableLoaded) {
+                    console.log('✅ カラーオモリ対応表の読み込み完了');
+                } else {
+                    console.log('⚠️ カラーオモリ対応表の読み込みをスキップ（処理は継続）');
+                }
+            } catch (error) {
+                console.warn('初期化エラー:', error);
+                console.warn('カラーオモリ対応表なしで処理を継続します');
+                // 空のテーブルで初期化
+                colorWeightTable = {
+                    byYahoo: {},
+                    byRakuten: {},
+                    byColor: {}
+                };
             }
             
+            // 初期化完了後、ボタン状態を更新
             updateConvertButton();
+            
+            console.log('✅ 初期化完了');
         }
 
         // 初期化実行
