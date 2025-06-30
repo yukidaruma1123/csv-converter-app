@@ -1064,7 +1064,7 @@
                         }
                     }
                     
-                    // 2. SubCodeがない場合、従来通りItemIdで商品マスタを確認
+                    // 2. SubCodeがない場合、または見つからない場合は必ずItemIdで商品マスタを確認
                     if (totalWeight === 0) {
                         console.log(`No SubCode or not found, using ItemId: ${itemId}`);
                         
@@ -1108,8 +1108,11 @@
                                     totalQuantity += quantity;
                                 } else {
                                     console.log(`Product not found in master: ${cleanItemCode}`);
-                                    totalWeight += 50 * quantity;
-                                    productDetails.push(`不明商品: ${cleanItemCode}`);
+                                    // 商品マスタでも見つからない場合、タイトルから重量推定
+                                    const weightMatch = title?.match(/(\d+)g/);
+                                    const itemWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
+                                    totalWeight += itemWeight;
+                                    productDetails.push(`${cleanItemCode}: ${itemWeight}g×${quantity}`);
                                     totalQuantity += quantity;
                                 }
                             });
@@ -1141,10 +1144,10 @@
                                 productDetails.push(detailParts.join(', '));
                             } else {
                                 console.log(`Product not found in master: ${cleanItemCode}`);
-                                // 商品マスタにない場合、タイトルから重量推定
+                                // 商品マスタでも見つからない場合、タイトルから重量推定
                                 const weightMatch = title?.match(/(\d+)g/);
                                 totalWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
-                                productDetails.push(`不明商品: ${cleanItemCode}`);
+                                productDetails.push(`${cleanItemCode}: ${totalWeight}g×${quantity}`);
                             }
                             totalQuantity = quantity;
                         }
@@ -1263,6 +1266,16 @@
                     const truncatedProductName = fullProductName.substring(0, 25); // 全角25文字制限
                     const hasOverflow = fullProductName.length > 25;
                     
+                    // ECサイト別の依頼主名を設定
+                    let requesterName = 'JGSフィッシュ';
+                    if (order.source === 'Amazon') {
+                        requesterName = 'JGSフィッシュ (Amazon店)';
+                    } else if (order.source === '楽天') {
+                        requesterName = 'JGSフィッシュ (楽天市場店)';
+                    } else if (order.source === 'Yahoo') {
+                        requesterName = 'JGSフィッシュ (yahoo!ｼｮｯﾋﾟﾝｸﾞ店)';
+                    }
+                    
                     const row = [
                         shipType, // 送り状種類：A（1kg以下）またはZ（1kg超過）
                         shipDate,
@@ -1276,7 +1289,7 @@
                         '050-3590-1444', // JGSフィッシュ電話番号
                         '104-0061', // JGSフィッシュ郵便番号
                         '東京都中央区銀座1-22-11 2F', // JGSフィッシュ住所
-                        'JGSフィッシュ', // JGSフィッシュ名
+                        requesterName, // ECサイト別のJGSフィッシュ名
                         escapeCSV(truncatedProductName), // 品名１（全角25文字制限）
                         Math.round(order.weight || 50),
                         hasOverflow ? escapeCSV(fullProductName) : '', // 品名詳細（オーバーフロー時は完全版）
