@@ -664,10 +664,18 @@
                         order.productName && order.productName.includes('❌エラー')
                     );
                     
+                    // エラー商品の詳細リストを作成
+                    const errorOrdersList = errorOrders.map(order => ({
+                        fileName: order.fileName || '不明なファイル',
+                        rowIndex: order.rowIndex || '不明',
+                        productName: order.productName,
+                        orderId: order.orderId
+                    }));
+                    
                     if (errorOrders.length > 0) {
                         console.error(`⚠️ ${errorOrders.length}件のエラー商品が見つかりました:`);
-                        errorOrders.forEach(order => {
-                            console.error(`  - 注文ID: ${order.orderId}, 商品: ${order.productName}`);
+                        errorOrdersList.forEach(error => {
+                            console.error(`  - ${error.fileName} ${error.rowIndex}行目: ${error.productName} (注文ID: ${error.orderId})`);
                         });
                     }
                     
@@ -679,7 +687,8 @@
                         yahoo: results.filter(r => r.source === 'Yahoo').length,
                         lightOrders: lightOrders.length,
                         heavyOrders: heavyOrders.length,
-                        errorOrders: errorOrders.length
+                        errorOrders: errorOrders.length,
+                        errorOrdersList: errorOrdersList
                     });
                 }, 500);
 
@@ -807,7 +816,9 @@
                         zipCode: formatZipCode(zipCode),
                         phoneNumber: formatPhoneNumber(phoneNumber),
                         weight: weight,
-                        orderId: `${orderId}:${orderItemId}:${quantity}`
+                        orderId: `${orderId}:${orderItemId}:${quantity}`,
+                        fileName: 'Amazon TSVファイル', // エラー追跡用
+                        rowIndex: i + 1 // TSVファイルのヘッダー分+1でExcel行番号
                     });
                 } catch (error) {
                     console.error(`Amazon row ${i} error:`, error);
@@ -947,7 +958,9 @@
                         zipCode: zipCode,
                         phoneNumber: phoneNumber,
                         weight: weight,
-                        orderId: orderId
+                        orderId: orderId,
+                        fileName: '楽天 CSVファイル', // エラー追跡用
+                        rowIndex: index + 2 // ヘッダー分+1でExcel行番号
                     });
                 } catch (error) {
                     console.error(`Rakuten row ${index} error:`, error);
@@ -1134,7 +1147,9 @@
                         zipCode: formatZipCode(shipZip),
                         phoneNumber: shipPhone,
                         weight: totalWeight,
-                        orderId: orderId
+                        orderId: orderId,
+                        fileName: 'Yahoo CSVファイル', // エラー追跡用
+                        rowIndex: index + 2 // ヘッダー分+1でExcel行番号
                     });
                 } catch (error) {
                     console.error(`Yahoo row ${index} error:`, error);
@@ -1301,6 +1316,7 @@
             const lightCount = stats.lightOrders || 0;
             const heavyCount = stats.heavyOrders || 0;
             const errorCount = stats.errorOrders || 0;
+            const errorOrdersList = stats.errorOrdersList || [];
             
             let messageContent = `
                 <div class="success-message">
@@ -1361,6 +1377,28 @@
             }
             
             messageContent += `</div>`;
+            
+            // エラー商品の詳細リストを追加
+            if (errorOrdersList.length > 0) {
+                messageContent += `
+                    <div class="error-details" style="background: #fed7d7; border: 1px solid #feb2b2; border-radius: 8px; padding: 16px; margin-top: 16px;">
+                        <div style="font-weight: 600; color: #742a2a; margin-bottom: 8px;">🔍 エラー商品詳細:</div>
+                        <div style="font-size: 14px; color: #742a2a;">
+                `;
+                
+                errorOrdersList.forEach(error => {
+                    messageContent += `
+                        <div style="margin-bottom: 4px;">
+                            • <strong>${error.fileName}</strong> ${error.rowIndex}行目: ${error.productName} (注文ID: ${error.orderId})
+                        </div>
+                    `;
+                });
+                
+                messageContent += `
+                        </div>
+                    </div>
+                `;
+            }
             
             messageArea.innerHTML = messageContent;
             
