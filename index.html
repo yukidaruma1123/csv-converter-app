@@ -659,6 +659,18 @@
                     const lightOrders = mergedOrders.filter(order => order.weight <= 1000);
                     const heavyOrders = mergedOrders.filter(order => order.weight > 1000);
                     
+                    // エラー商品の確認
+                    const errorOrders = mergedOrders.filter(order => 
+                        order.productName && order.productName.includes('❌エラー')
+                    );
+                    
+                    if (errorOrders.length > 0) {
+                        console.error(`⚠️ ${errorOrders.length}件のエラー商品が見つかりました:`);
+                        errorOrders.forEach(order => {
+                            console.error(`  - 注文ID: ${order.orderId}, 商品: ${order.productName}`);
+                        });
+                    }
+                    
                     showResult(csvContent, {
                         original: results.length,
                         merged: mergedOrders.length,
@@ -667,7 +679,7 @@
                         yahoo: results.filter(r => r.source === 'Yahoo').length,
                         lightOrders: lightOrders.length,
                         heavyOrders: heavyOrders.length,
-                        unknownProducts: []
+                        errorOrders: errorOrders.length
                     });
                 }, 500);
 
@@ -1000,7 +1012,7 @@
                             totalWeight += itemTotalWeight;
                             productDetails.push(`${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
                             totalQuantity += quantity;
-                            console.log(`Yahoo color table match: ${productCode} -> ${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
+                            console.log(`✅ Yahoo color table match: ${productCode} -> ${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
                             return true;
                         }
                         
@@ -1019,11 +1031,21 @@
                             totalWeight += itemTotalWeight;
                             productDetails.push(itemDetailParts.join(', '));
                             totalQuantity += quantity;
-                            console.log(`Yahoo master match: ${productCode} -> ${itemDetailParts.join(', ')} × ${quantity}`);
+                            console.log(`✅ Yahoo master match: ${productCode} -> ${itemDetailParts.join(', ')} × ${quantity}`);
                             return true;
                         }
                         
-                        console.log(`Yahoo product not found: ${productCode}`);
+                        // 3. どちらからも見つからない場合はエラー
+                        console.error(`❌ ERROR: Yahoo product not found: "${productCode}"`);
+                        console.error(`   - Not found in color weight table (Yahoo表記 B列)`);
+                        console.error(`   - Not found in product master (商品マスタ C列)`);
+                        console.error(`   - Available color table keys:`, Object.keys(colorWeightTable.byYahoo || {}));
+                        console.error(`   - Available master keys:`, Object.keys(productMaster || {}));
+                        
+                        // エラー情報を商品詳細に追加
+                        productDetails.push(`❌エラー: ${productCode} (未登録商品)`);
+                        totalQuantity += quantity;
+                        
                         return false;
                     };
 
@@ -1278,13 +1300,27 @@
             // 重量別の統計を計算
             const lightCount = stats.lightOrders || 0;
             const heavyCount = stats.heavyOrders || 0;
+            const errorCount = stats.errorOrders || 0;
             
-            messageArea.innerHTML = `
+            let messageContent = `
                 <div class="success-message">
                     <strong>🎉 変換完了！</strong><br>
                     ${stats.original}件のデータを${stats.merged}件にまとめてヤマト運輸形式に変換しました。
                 </div>
-                
+            `;
+            
+            // エラーがある場合は警告表示
+            if (errorCount > 0) {
+                messageContent += `
+                    <div class="error-message">
+                        <strong>⚠️ 警告: ${errorCount}件のエラー商品があります</strong><br>
+                        カラーオモリ対応表または商品マスタに登録されていない商品があります。<br>
+                        詳細はブラウザのコンソール（F12キー）でご確認ください。
+                    </div>
+                `;
+            }
+            
+            messageContent += `
                 <div class="summary-stats">
                     <div class="stat-box">
                         <div class="stat-number">${stats.amazon}</div>
@@ -1313,8 +1349,20 @@
                         <div class="stat-number">${heavyCount}</div>
                         <div class="stat-label">1kg超過 (Z)</div>
                     </div>
-                </div>
             `;
+            
+            if (errorCount > 0) {
+                messageContent += `
+                    <div class="stat-box" style="border-color: #e53e3e;">
+                        <div class="stat-number" style="color: #e53e3e;">${errorCount}</div>
+                        <div class="stat-label" style="color: #e53e3e;">エラー商品</div>
+                    </div>
+                `;
+            }
+            
+            messageContent += `</div>`;
+            
+            messageArea.innerHTML = messageContent;
             
             downloadButton.style.display = 'block';
             window.csvData = csvContent;
