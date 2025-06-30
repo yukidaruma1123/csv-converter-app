@@ -474,7 +474,7 @@
             const statusElement = document.getElementById(statusId);
             const inputElement = event.target;
 
-            console.log(`File selected for ${type}:`, file ? file.name : 'none');
+            console.log(`📁 File selected for ${type}:`, file ? file.name : 'none');
 
             if (file) {
                 selectedFiles[type] = file;
@@ -484,6 +484,7 @@
                 
                 // 商品マスタファイルの場合は即座に読み込み
                 if (type === 'master') {
+                    console.log('🔄 Loading product master...');
                     loadProductMaster(file);
                 }
             } else {
@@ -496,9 +497,11 @@
                 
                 if (type === 'master') {
                     productMaster = {};
+                    console.log('🗑️ Product master cleared');
                 }
             }
 
+            console.log('📊 Current file selection:', selectedFiles);
             updateConvertButton();
         }
 
@@ -618,7 +621,25 @@
             
             convertButton.disabled = !hasMaster || !hasData;
             
-            console.log('Button update:', { hasMaster, hasData, disabled: convertButton.disabled });
+            console.log('🔍 Button update:', { 
+                hasMaster, 
+                hasData, 
+                disabled: convertButton.disabled,
+                masterFileSelected: !!selectedFiles.master,
+                masterProductCount: Object.keys(productMaster).length,
+                amazonSelected: !!selectedFiles.amazon,
+                rakutenSelected: !!selectedFiles.rakuten,
+                yahooSelected: !!selectedFiles.yahoo
+            });
+            
+            // デバッグ用：ボタンの状態を画面にも表示
+            if (convertButton.disabled) {
+                convertButton.textContent = hasMaster ? 
+                    'ECサイトのデータファイルを選択してください' : 
+                    '商品マスタファイルを選択してください';
+            } else {
+                convertButton.textContent = 'データを変換してダウンロード';
+            }
         }
 
         // 変換処理
@@ -662,15 +683,21 @@
                 
                 updateProgress(100, '変換完了!');
                 
+                console.log('🎯 Starting result preparation...');
+                
                 setTimeout(() => {
+                    console.log('⏰ Timeout reached, preparing statistics...');
+                    
                     // 重量別の統計を計算
                     const lightOrders = mergedOrders.filter(order => order.weight <= 1000);
                     const heavyOrders = mergedOrders.filter(order => order.weight > 1000);
+                    console.log(`📊 Weight classification: ${lightOrders.length} light, ${heavyOrders.length} heavy`);
                     
                     // エラー商品の確認
                     const errorOrders = mergedOrders.filter(order => 
                         order.productName && order.productName.includes('❌エラー')
                     );
+                    console.log(`❌ Error orders found: ${errorOrders.length}`);
                     
                     // エラー商品の詳細リストを作成
                     const errorOrdersList = errorOrders.map(order => ({
@@ -687,7 +714,7 @@
                         });
                     }
                     
-                    showResult(csvContent, {
+                    const stats = {
                         original: results.length,
                         merged: mergedOrders.length,
                         amazon: results.filter(r => r.source === 'Amazon').length,
@@ -697,7 +724,29 @@
                         heavyOrders: heavyOrders.length,
                         errorOrders: errorOrders.length,
                         errorOrdersList: errorOrdersList
-                    });
+                    };
+                    
+                    console.log('📈 Final stats:', stats);
+                    console.log('🎨 Calling showResult...');
+                    
+                    try {
+                        showResult(csvContent, stats);
+                        console.log('✅ showResult completed successfully');
+                    } catch (error) {
+                        console.error('💥 Error in showResult:', error);
+                        // フォールバック: 簡単な結果表示
+                        progressSection.style.display = 'none';
+                        resultSection.style.display = 'block';
+                        messageArea.innerHTML = `
+                            <div class="success-message">
+                                <strong>🎉 変換完了！</strong><br>
+                                ${stats.original}件のデータを${stats.merged}件にまとめて変換しました。
+                            </div>
+                        `;
+                        downloadButton.style.display = 'block';
+                        window.csvData = csvContent;
+                        downloadButton.onclick = () => downloadCSV(csvContent, stats.merged);
+                    }
                 }, 500);
 
             } catch (error) {
