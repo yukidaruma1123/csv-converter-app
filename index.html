@@ -895,7 +895,7 @@
                     // 重量計算の新しいロジック
                     let weight = 50 * quantity; // デフォルト重量×注文数
                     let productDetail = itemName;
-                    let hasError = false;
+                    let foundProduct = false; // 商品が見つかったかのフラグ
 
                     // 1. まずSKU情報（FB列）からカラーオモリ対応表を検索
                     if (skuInfo && colorWeightTable.byRakuten) {
@@ -912,42 +912,15 @@
                             weight = colorInfo.weight * quantity;
                             productDetail = `${colorInfo.color}: ${colorInfo.weight}g×${quantity}`;
                             console.log(`✅ Rakuten SKU match: ${cleanSKU} -> ${colorInfo.color}: ${colorInfo.weight}g`);
+                            foundProduct = true;
                         } else {
-                            console.log(`Rakuten SKU not found in table: "${cleanSKU}"`);
-                            // SKU情報があるが対応表にない場合は従来の処理へ
-                            const masterInfo = productMaster[itemId];
-                            if (masterInfo && masterInfo.colorSets) {
-                                // 複数カラーセット対応
-                                let unitTotalWeight = 0;
-                                const detailParts = [];
-                                
-                                masterInfo.colorSets.forEach(set => {
-                                    unitTotalWeight += set.weight * set.quantity;
-                                    detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
-                                });
-                                
-                                weight = unitTotalWeight * quantity;
-                                productDetail = detailParts.join(', ');
-                                console.log(`✅ Rakuten master match: ${itemId} -> ${detailParts.join(', ')} × ${quantity}`);
-                            } else {
-                                // エラー: どちらからも見つからない
-                                console.error(`❌ ERROR: Rakuten product not found: "${cleanSKU}" / "${itemId}"`);
-                                console.error(`   - Not found in color weight table (楽天表記 C列)`);
-                                console.error(`   - Not found in product master (商品マスタ C列)`);
-                                
-                                // 商品名から重量推定（最後の手段）
-                                const weightMatch = itemName?.match(/(\d+)g/);
-                                if (weightMatch) {
-                                    weight = parseInt(weightMatch[1]) * quantity;
-                                }
-                                productDetail = `❌エラー: ${cleanSKU}/${itemId} (${itemName}) - 未登録商品`;
-                                hasError = true;
-                            }
+                            console.log(`Rakuten SKU not found in table: "${cleanSKU}", trying itemId next`);
                         }
                     }
-                    // 2. SKU情報がない場合、従来通り商品管理番号で商品マスタを確認
-                    else {
-                        console.log(`No Rakuten SKU info, using itemId: ${itemId}`);
+                    
+                    // 2. SKU情報で見つからない場合、または SKU情報がない場合、商品管理番号で商品マスタを確認
+                    if (!foundProduct) {
+                        console.log(`Checking Rakuten itemId: ${itemId}`);
                         const masterInfo = productMaster[itemId];
                         if (masterInfo && masterInfo.colorSets) {
                             // 複数カラーセット対応
@@ -962,19 +935,26 @@
                             weight = unitTotalWeight * quantity;
                             productDetail = detailParts.join(', ');
                             console.log(`✅ Rakuten master match: ${itemId} -> ${detailParts.join(', ')} × ${quantity}`);
-                        } else {
-                            // エラー: 商品マスタにない
-                            console.error(`❌ ERROR: Rakuten product not found: "${itemId}"`);
-                            console.error(`   - Not found in product master (商品マスタ C列)`);
-                            
-                            // 商品名から重量推定（最後の手段）
-                            const weightMatch = itemName?.match(/(\d+)g/);
-                            if (weightMatch) {
-                                weight = parseInt(weightMatch[1]) * quantity;
-                            }
-                            productDetail = `❌エラー: ${itemId} (${itemName}) - 商品マスタ未登録`;
-                            hasError = true;
+                            foundProduct = true;
                         }
+                    }
+                    
+                    // 3. どちらからも見つからない場合のみエラー
+                    let hasError = false;
+                    if (!foundProduct) {
+                        console.error(`❌ ERROR: Rakuten product not found: SKU:"${skuInfo}" / itemId:"${itemId}"`);
+                        console.error(`   - Not found in color weight table (楽天表記 C列)`);
+                        console.error(`   - Not found in product master (商品マスタ C列)`);
+                        
+                        // 商品名から重量推定（最後の手段）
+                        const weightMatch = itemName?.match(/(\d+)g/);
+                        if (weightMatch) {
+                            weight = parseInt(weightMatch[1]) * quantity;
+                        }
+                        
+                        const skuPart = skuInfo ? `${skuInfo}/` : '';
+                        productDetail = `❌エラー: ${skuPart}${itemId} (${itemName}) - 未登録商品`;
+                        hasError = true;
                     }
 
                     orders.push({
