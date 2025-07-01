@@ -772,7 +772,7 @@
                         
                         masterInfo.colorSets.forEach(set => {
                             unitTotalWeight += set.weight * set.quantity;
-                            detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                            detailParts.push(`${set.color}: ${set.weight}g×${set.quantity * quantity}`);
                         });
                         
                         weight = unitTotalWeight * quantity;
@@ -894,7 +894,7 @@
                             
                             masterInfo.colorSets.forEach(set => {
                                 unitTotalWeight += set.weight * set.quantity;
-                                detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                                detailParts.push(`${set.color}: ${set.weight}g×${set.quantity * quantity}`);
                             });
                             
                             weight = unitTotalWeight * quantity;
@@ -1075,7 +1075,7 @@
                                     
                                     masterInfo.colorSets.forEach(set => {
                                         itemUnitWeight += set.weight * set.quantity;
-                                        itemDetailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                                        itemDetailParts.push(`${set.color}: ${set.weight}g×${set.quantity * quantity}`);
                                     });
                                     
                                     const itemTotalWeight = itemUnitWeight * quantity;
@@ -1110,7 +1110,7 @@
                                 
                                 masterInfo.colorSets.forEach(set => {
                                     unitTotalWeight += set.weight * set.quantity;
-                                    detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                                    detailParts.push(`${set.color}: ${set.weight}g×${set.quantity * quantity}`);
                                 });
                                 
                                 totalWeight = unitTotalWeight * quantity;
