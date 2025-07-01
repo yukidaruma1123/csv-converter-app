@@ -1154,13 +1154,53 @@
                 const key = `${order.recipientName}_${order.shipAddress}_${order.phoneNumber}`;
                 
                 if (merged[key]) {
+                    // 重量と総数量を加算
                     merged[key].weight += order.weight;
                     merged[key].quantity += order.quantity;
                     merged[key].orderId += `,${order.orderId}`;
                     
-                    if (!merged[key].productName.includes(order.productName)) {
-                        merged[key].productName += `, ${order.productName}`;
-                    }
+                    // 商品名の統合処理を改善
+                    const existingProducts = merged[key].productName.split(', ');
+                    const newProducts = order.productName.split(', ');
+                    
+                    // 各新商品について処理
+                    newProducts.forEach(newProduct => {
+                        // 商品名から重量と数量の情報を抽出（例: "銀: 80g×3"）
+                        const newMatch = newProduct.match(/^(.+?):\s*(\d+)g×(\d+)$/);
+                        if (newMatch) {
+                            const [, newColor, newWeight, newQty] = newMatch;
+                            let found = false;
+                            
+                            // 既存商品の中で同じ色・重量の商品を探す
+                            for (let i = 0; i < existingProducts.length; i++) {
+                                const existingMatch = existingProducts[i].match(/^(.+?):\s*(\d+)g×(\d+)$/);
+                                if (existingMatch) {
+                                    const [, existingColor, existingWeight, existingQty] = existingMatch;
+                                    
+                                    // 同じ色・重量の商品が見つかった場合、数量を統合
+                                    if (newColor === existingColor && newWeight === existingWeight) {
+                                        const totalQty = parseInt(existingQty) + parseInt(newQty);
+                                        existingProducts[i] = `${newColor}: ${newWeight}g×${totalQty}`;
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // 同じ商品が見つからなかった場合、新しい商品として追加
+                            if (!found) {
+                                existingProducts.push(newProduct);
+                            }
+                        } else {
+                            // パターンにマッチしない商品名（不明商品など）は重複チェックして追加
+                            if (!existingProducts.includes(newProduct)) {
+                                existingProducts.push(newProduct);
+                            }
+                        }
+                    });
+                    
+                    // 統合した商品名を更新
+                    merged[key].productName = existingProducts.join(', ');
                 } else {
                     merged[key] = { ...order };
                 }
