@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ヤマト運輸発送データ作成マクロ</title>
+    <title>CSV統合変換システム - ヤマト運輸データ作成</title>
+    <meta name="description" content="Amazon・楽天・Yahoo のCSVデータをヤマト運輸用CSVに変換するWebアプリケーション">
     <style>
         * {
             margin: 0;
@@ -12,927 +13,1447 @@
         }
 
         body {
-            font-family: 'Yu Gothic', 'Meiryo', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
             padding: 20px;
+            color: #333;
         }
 
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
+            border-radius: 8px;
+            border: 1px solid #e1e5e9;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 30px;
         }
 
         .header {
-            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-            color: white;
-            padding: 30px;
             text-align: center;
+            margin-bottom: 40px;
         }
 
         .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 30px;
-            padding: 30px;
-        }
-
-        .sidebar {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 10px;
-            border: 2px solid #e9ecef;
-        }
-
-        .sidebar h2 {
-            color: #495057;
-            margin-bottom: 20px;
-            font-size: 1.3rem;
-        }
-
-        .config-section {
-            margin-bottom: 25px;
-        }
-
-        .config-section label {
-            display: block;
+            color: #2d3748;
+            font-size: 28px;
+            font-weight: 700;
             margin-bottom: 8px;
-            font-weight: bold;
-            color: #495057;
         }
 
-        .config-section input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #dee2e6;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-
-        .config-section input:focus {
-            outline: none;
-            border-color: #4CAF50;
-        }
-
-        .action-buttons {
-            display: grid;
-            gap: 15px;
-            margin-top: 25px;
-        }
-
-        .btn {
-            padding: 15px 20px;
-            border: none;
-            border-radius: 8px;
+        .header p {
+            color: #718096;
             font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
         }
 
-        .btn-primary {
-            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-            color: white;
+        .upload-section {
+            margin-bottom: 30px;
         }
 
-        .btn-success {
-            background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
-            color: white;
+        .file-group {
+            margin-bottom: 20px;
         }
 
-        .btn-warning {
-            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
-            color: #212529;
+        .file-label {
+            display: block;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+            font-size: 14px;
         }
 
-        .btn-danger {
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-            color: white;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .main-area {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .upload-area {
-            border: 3px dashed #dee2e6;
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-            background: #f8f9fa;
-            transition: all 0.3s;
-        }
-
-        .upload-area:hover {
-            border-color: #4CAF50;
-            background: #e8f5e8;
-        }
-
-        .upload-area.dragover {
-            border-color: #4CAF50;
-            background: #e8f5e8;
+        .file-input-wrapper {
+            position: relative;
+            display: block;
+            width: 100%;
         }
 
         .file-input {
-            display: none;
-        }
-
-        .file-select-btn {
-            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            margin: 10px;
-        }
-
-        .data-table {
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        .table-header {
-            background: #343a40;
-            color: white;
-            padding: 15px 20px;
-            font-weight: bold;
-        }
-
-        .table-content {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        table {
+            display: block;
             width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        th {
-            background: #495057;
-            color: white;
-            font-weight: bold;
-            position: sticky;
-            top: 0;
-        }
-
-        tr:hover {
-            background: #f8f9fa;
-        }
-
-        .status-message {
-            padding: 15px;
+            padding: 12px 16px;
+            border: 2px dashed #cbd5e0;
             border-radius: 8px;
-            margin: 10px 0;
-            font-weight: bold;
+            background: #f7fafc;
+            color: #4a5568;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            font-family: inherit;
         }
 
-        .status-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        .file-input:hover {
+            border-color: #007bff;
+            background: #edf2f7;
         }
 
-        .status-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+        .file-input.has-file {
+            border-color: #28a745;
+            background: #f0fff4;
+            border-style: solid;
         }
 
-        .status-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
+        .file-status {
+            font-size: 12px;
+            margin-top: 4px;
+            color: #718096;
+        }
+
+        .file-status.success {
+            color: #28a745;
+        }
+
+        .convert-button {
+            width: 100%;
+            padding: 14px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-bottom: 20px;
+        }
+
+        .convert-button:hover:not(:disabled) {
+            background: #0056b3;
+        }
+
+        .convert-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .progress-section {
+            display: none;
+            margin-bottom: 20px;
         }
 
         .progress-bar {
             width: 100%;
-            height: 20px;
-            background: #e9ecef;
-            border-radius: 10px;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
             overflow: hidden;
-            margin: 10px 0;
         }
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #4CAF50, #45a049);
-            transition: width 0.3s;
+            background: #007bff;
+            width: 0%;
+            transition: width 0.3s ease;
         }
 
-        .icon {
-            width: 20px;
-            height: 20px;
+        .progress-text {
+            text-align: center;
+            margin-top: 8px;
+            color: #4a5568;
+            font-size: 14px;
         }
 
-        @media (max-width: 768px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-            
-            .header h1 {
-                font-size: 2rem;
-            }
+        .result-section {
+            display: none;
+        }
+
+        .success-message {
+            background: #f0fff4;
+            border: 1px solid #9ae6b4;
+            color: #22543d;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .error-message {
+            background: #fed7d7;
+            border: 1px solid #feb2b2;
+            color: #742a2a;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .download-button {
+            width: 100%;
+            padding: 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .download-button:hover {
+            background: #218838;
+        }
+
+        .reset-button {
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            color: #4a5568;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: all 0.2s;
+        }
+
+        .reset-button:hover {
+            background: #f7fafc;
+        }
+
+        .info-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 16px;
+            margin-top: 20px;
+        }
+
+        .info-title {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+
+        .info-list {
+            color: #6c757d;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .info-list li {
+            margin-bottom: 4px;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .stat-box {
+            background: #f7fafc;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stat-number {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #718096;
+            margin-top: 2px;
+        }
+
+        .required-label {
+            color: #e53e3e;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>ヤマト運輸発送データ作成マクロ</h1>
-            <p>ECサイトデータをヤマト運輸発送データに変換</p>
+            <h1>CSV統合変換システム</h1>
+            <p>Amazon・楽天・Yahoo のデータをヤマト運輸用に変換</p>
         </div>
 
-        <div class="main-content">
-            <div class="sidebar">
-                <h2>📋 発送元データ</h2>
-                
-                <div class="config-section">
-                    <label for="phone">ご依頼主電話番号 (半角数字15文字ハイフン含む)</label>
-                    <input type="text" id="phone" value="050-3590-1444" maxlength="15">
-                </div>
-
-                <div class="config-section">
-                    <label for="zipcode">ご依頼主郵便番号 (半角数字8文字)</label>
-                    <input type="text" id="zipcode" value="104-0061" maxlength="8">
-                </div>
-
-                <div class="config-section">
-                    <label for="address">ご依頼主住所 (全角32文字)</label>
-                    <input type="text" id="address" value="東京都中央区銀座 1-22-11 2F" maxlength="32">
-                </div>
-
-                <div class="config-section">
-                    <label for="name">ご依頼主名 (全角16文字)</label>
-                    <input type="text" id="name" value="JGSフィッシュ" maxlength="16">
-                </div>
-
-                <h2>📝 使用方法</h2>
-                <div class="action-buttons">
-                    <button class="btn btn-danger" onclick="clearData()">
-                        <span>🗑️</span> ①：発送データを消去する
-                    </button>
-                    <button class="btn btn-primary" onclick="importData()">
-                        <span>📥</span> ②：ECサイトの販売データを取り込む
-                    </button>
-                    <button class="btn btn-warning" onclick="previewData()">
-                        <span>👁️</span> ③：取得した発送データを確認する
-                    </button>
-                    <button class="btn btn-success" onclick="exportData()">
-                        <span>📤</span> ④：ヤマト輸送発送データをCSV出力
-                    </button>
-                </div>
-
-                <div class="config-section">
-                    <label>商品マスタ更新</label>
-                    <input type="file" id="masterFile" class="file-input" accept=".xlsx,.xlsm" onchange="updateMaster(this)">
-                    <button class="file-select-btn" onclick="document.getElementById('masterFile').click()">
-                        📊 マスタファイル選択
-                    </button>
-                </div>
+        <div class="upload-section">
+            <div class="file-group">
+                <label class="file-label">商品マスタファイル <span class="required-label">*必須</span></label>
+                <input type="file" id="masterFile" class="file-input" accept=".xlsx,.xlsm,.xls">
+                <div class="file-status" id="masterStatus">商品マスタファイル(.xlsx/.xlsm)を選択してください</div>
             </div>
 
-            <div class="main-area">
-                <div class="upload-area" id="uploadArea">
-                    <h3>📁 ECサイトデータファイルをドロップまたは選択</h3>
-                    <p>Amazon, Yahoo, 楽天のCSVファイルに対応</p>
-                    <input type="file" id="dataFile" class="file-input" multiple accept=".csv,.txt" onchange="handleFiles(this.files)">
-                    <button class="file-select-btn" onclick="document.getElementById('dataFile').click()">
-                        ファイル選択
-                    </button>
-                </div>
-
-                <div id="statusMessage"></div>
-                <div id="progressBar" class="progress-bar" style="display: none;">
-                    <div id="progressFill" class="progress-fill" style="width: 0%;"></div>
-                </div>
-
-                <div class="data-table" id="dataTable" style="display: none;">
-                    <div class="table-header">
-                        📦 処理結果プレビュー
-                    </div>
-                    <div class="table-content">
-                        <table id="resultTable">
-                            <thead id="tableHeader"></thead>
-                            <tbody id="tableBody"></tbody>
-                        </table>
-                    </div>
-                </div>
+            <div class="file-group">
+                <label class="file-label">Amazonデータ (TSV形式)</label>
+                <input type="file" id="amazonFile" class="file-input" accept=".txt,.tsv,.csv">
+                <div class="file-status" id="amazonStatus">ファイルを選択してください</div>
             </div>
+
+            <div class="file-group">
+                <label class="file-label">楽天データ (CSV形式)</label>
+                <input type="file" id="rakutenFile" class="file-input" accept=".csv">
+                <div class="file-status" id="rakutenStatus">ファイルを選択してください</div>
+            </div>
+
+            <div class="file-group">
+                <label class="file-label">Yahooデータ (CSV形式)</label>
+                <input type="file" id="yahooFile" class="file-input" accept=".csv">
+                <div class="file-status" id="yahooStatus">ファイルを選択してください</div>
+            </div>
+        </div>
+
+        <button class="convert-button" id="convertButton" disabled>
+            データを変換してダウンロード
+        </button>
+
+        <div class="progress-section" id="progressSection">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">処理中...</div>
+        </div>
+
+        <div class="result-section" id="resultSection">
+            <div id="messageArea"></div>
+            <button class="download-button" id="downloadButton" style="display: none;">
+                ヤマト運輸用CSVをダウンロード
+            </button>
+            <button class="reset-button" id="resetButton">
+                最初からやり直す
+            </button>
+        </div>
+
+        <div class="info-section">
+            <div class="info-title">使用方法</div>
+            <ul class="info-list">
+                <li>1. 商品マスタファイル(.xlsx/.xlsm)を選択</li>
+                <li>2. 各ECサイトのCSVファイルを選択</li>
+                <li>3. 「データを変換してダウンロード」をクリック</li>
+                <li>4. 変換完了後、ヤマト運輸用CSVをダウンロード</li>
+                <li>※ ファイル形式：Amazon(TSV)、楽天・Yahoo(CSV)</li>
+                <li>※ 同一配送先は自動統合されます</li>
+                <li>※ 重量は商品マスタから自動計算されます</li>
+                <li>※ カラーオモリ対応表を自動読み込みします</li>
+            </ul>
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
         // グローバル変数
-        let productMaster = [];
-        let processedData = [];
-        let currentFiles = [];
-
-        // 初期化時に商品マスタをデフォルトで設定
-        window.onload = function() {
-            initializeDefaultMaster();
-            setupDragAndDrop();
+        let productMaster = {};
+        let colorWeightTable = {}; // カラーオモリ対応表
+        let selectedFiles = {
+            master: null,
+            amazon: null,
+            rakuten: null,
+            yahoo: null
         };
 
-        // デフォルト商品マスタの初期化
-        function initializeDefaultMaster() {
-            productMaster = [
-                ["販売サイト", "商品詳細", "商品No", "重さ", "個数", "色"],
-                ["Yahoo", "15g 2個入 ゴールド金 メタルジグ タングステン", "jg152", 15, 2, "金"],
-                ["Amazon", "メタルジグ タングステン 高純度 無塗装 定番形状", "jg256", 25, 6, "金"],
-                // ... 他の商品データも同様に追加可能
-            ];
-            showStatus("デフォルト商品マスタを読み込みました", "info");
-        }
+        // DOM要素
+        const masterFile = document.getElementById('masterFile');
+        const amazonFile = document.getElementById('amazonFile');
+        const rakutenFile = document.getElementById('rakutenFile');
+        const yahooFile = document.getElementById('yahooFile');
+        const convertButton = document.getElementById('convertButton');
+        const progressSection = document.getElementById('progressSection');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const resultSection = document.getElementById('resultSection');
+        const messageArea = document.getElementById('messageArea');
+        const downloadButton = document.getElementById('downloadButton');
+        const resetButton = document.getElementById('resetButton');
 
-        // ドラッグ&ドロップ設定
-        function setupDragAndDrop() {
-            const uploadArea = document.getElementById('uploadArea');
-            
-            uploadArea.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                uploadArea.classList.add('dragover');
-            });
-
-            uploadArea.addEventListener('dragleave', function(e) {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-            });
-
-            uploadArea.addEventListener('drop', function(e) {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-                const files = e.dataTransfer.files;
-                handleFiles(files);
-            });
-        }
-
-        // ファイル処理
-        function handleFiles(files) {
-            currentFiles = Array.from(files);
-            showStatus(`${files.length}個のファイルが選択されました`, "info");
-            
-            // ファイル名を表示
-            const fileNames = Array.from(files).map(file => file.name).join(', ');
-            document.getElementById('uploadArea').innerHTML = `
-                <h3>📁 選択されたファイル</h3>
-                <p>${fileNames}</p>
-                <button class="file-select-btn" onclick="document.getElementById('dataFile').click()">
-                    別のファイルを選択
-                </button>
-            `;
-        }
-
-        // 商品マスタ更新
-        async function updateMaster(input) {
-            const file = input.files[0];
-            if (!file) return;
-
+        // カラーオモリ対応表を自動読み込み
+        async function loadColorWeightTable() {
             try {
-                showStatus("商品マスタを読み込み中...", "info");
+                console.log('Loading color weight table...');
+                const response = await fetch('./カラーオモリ対応表.xlsx');
+                if (!response.ok) {
+                    throw new Error(`カラーオモリ対応表の読み込みに失敗しました: ${response.status}`);
+                }
                 
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                
+                console.log('Color weight table sheets:', workbook.SheetNames);
+                
+                // 最初のシートを使用
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { 
+                    header: 1,
+                    defval: '',
+                    blankrows: false
+                });
+                
+                console.log('Color weight table rows:', jsonData.length);
+                console.log('Headers:', jsonData[0]);
+                
+                // カラーオモリ対応表オブジェクトを構築
+                // A列: 空、B列: Yahoo表記、C列: 楽天表記、D列: 色、E列: 重さ
+                colorWeightTable = {
+                    byYahoo: {},  // B列(Yahoo表記)でのマッピング
+                    byRakuten: {}, // C列(楽天表記)でのマッピング
+                    byColor: {}    // D列(色)でのマッピング（従来互換用）
+                };
+                let loadedCount = 0;
+                
+                for (let i = 1; i < jsonData.length; i++) {
+                    const row = jsonData[i];
+                    if (row.length >= 5) {
+                        const yahooCode = String(row[1] || '').trim();     // B列: Yahoo表記
+                        const rakutenCode = String(row[2] || '').trim();   // C列: 楽天表記
+                        const colorName = String(row[3] || '').trim();     // D列: 色
+                        const weightStr = String(row[4] || '').trim();     // E列: 重さ("60g", "80g"形式)
+                        
+                        // 重さから数値を抽出
+                        const weightMatch = weightStr.match(/(\d+)/);
+                        const weight = weightMatch ? parseFloat(weightMatch[1]) : 0;
+                        
+                        if (weight > 0) {
+                            // 色を一文字に変換
+                            let shortColor = colorName;
+                            if (colorName.endsWith('色')) {
+                                shortColor = colorName.slice(0, -1); // 最後の「色」を除去
+                            }
+                            
+                            // Yahoo表記でのマッピング（B列）
+                            if (yahooCode) {
+                                colorWeightTable.byYahoo[yahooCode] = {
+                                    color: shortColor,
+                                    weight: weight
+                                };
+                                console.log(`Yahoo mapping: ${yahooCode} -> ${shortColor}: ${weight}g`);
+                            }
+                            
+                            // 楽天表記でのマッピング（C列）
+                            if (rakutenCode) {
+                                colorWeightTable.byRakuten[rakutenCode] = {
+                                    color: shortColor,
+                                    weight: weight
+                                };
+                                console.log(`Rakuten mapping: ${rakutenCode} -> ${shortColor}: ${weight}g`);
+                            }
+                            
+                            // カラー名でのマッピング（D列・従来互換用）
+                            if (colorName) {
+                                colorWeightTable.byColor[colorName] = weight;
+                            }
+                            
+                            loadedCount++;
+                        }
+                    }
+                }
+                
+                console.log(`Color weight table loaded: ${loadedCount} colors`);
+                console.log('Yahoo codes:', Object.keys(colorWeightTable.byYahoo));
+                console.log('Rakuten codes:', Object.keys(colorWeightTable.byRakuten));
+                return true;
+                
+            } catch (error) {
+                console.error('カラーオモリ対応表読み込みエラー:', error);
+                // エラーでも処理を継続（対応表なしでも動作するため）
+                return false;
+            }
+        }
+
+        // ファイル選択イベント
+        masterFile.addEventListener('change', (e) => handleFileSelect(e, 'master', 'masterStatus'));
+        amazonFile.addEventListener('change', (e) => handleFileSelect(e, 'amazon', 'amazonStatus'));
+        rakutenFile.addEventListener('change', (e) => handleFileSelect(e, 'rakuten', 'rakutenStatus'));
+        yahooFile.addEventListener('change', (e) => handleFileSelect(e, 'yahoo', 'yahooStatus'));
+
+        function handleFileSelect(event, type, statusId) {
+            const file = event.target.files[0];
+            const statusElement = document.getElementById(statusId);
+            const inputElement = event.target;
+
+            console.log(`File selected for ${type}:`, file ? file.name : 'none');
+
+            if (file) {
+                selectedFiles[type] = file;
+                statusElement.textContent = `選択済み: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`;
+                statusElement.className = 'file-status success';
+                inputElement.classList.add('has-file');
+                
+                // 商品マスタファイルの場合は即座に読み込み
+                if (type === 'master') {
+                    loadProductMaster(file);
+                }
+            } else {
+                selectedFiles[type] = null;
+                statusElement.textContent = type === 'master' ? 
+                    '商品マスタファイル(.xlsx/.xlsm)を選択してください' : 
+                    'ファイルを選択してください';
+                statusElement.className = 'file-status';
+                inputElement.classList.remove('has-file');
+                
+                if (type === 'master') {
+                    productMaster = {};
+                }
+            }
+
+            updateConvertButton();
+        }
+
+        async function loadProductMaster(file) {
+            try {
+                console.log('Loading product master...');
                 const arrayBuffer = await file.arrayBuffer();
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                 
-                // 商品マスタシートを読み込み
-                const masterSheetName = workbook.SheetNames.find(name => 
-                    name.includes('商品マスタ') || name.includes('マスタ')
-                ) || workbook.SheetNames[0];
+                console.log('Workbook sheets:', workbook.SheetNames);
                 
-                const worksheet = workbook.Sheets[masterSheetName];
-                productMaster = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                
-                showStatus(`商品マスタを更新しました (${productMaster.length - 1}件の商品)`, "success");
-            } catch (error) {
-                showStatus(`商品マスタの読み込みエラー: ${error.message}`, "error");
-            }
-        }
-
-        // ①発送データを消去
-        function clearData() {
-            if (confirm('発送データを消去しますか？')) {
-                processedData = [];
-                currentFiles = [];
-                document.getElementById('dataTable').style.display = 'none';
-                document.getElementById('uploadArea').innerHTML = `
-                    <h3>📁 ECサイトデータファイルをドロップまたは選択</h3>
-                    <p>Amazon, Yahoo, 楽天のCSVファイルに対応</p>
-                    <input type="file" id="dataFile" class="file-input" multiple accept=".csv,.txt" onchange="handleFiles(this.files)">
-                    <button class="file-select-btn" onclick="document.getElementById('dataFile').click()">
-                        ファイル選択
-                    </button>
-                `;
-                showStatus("発送データを消去しました", "success");
-            }
-        }
-
-        // ②ECサイトの販売データを取り込む
-        async function importData() {
-            if (currentFiles.length === 0) {
-                showStatus("先にファイルを選択してください", "error");
-                return;
-            }
-
-            try {
-                showProgress(0);
-                showStatus("データを取り込み中...", "info");
-                
-                processedData = [];
-                
-                for (let i = 0; i < currentFiles.length; i++) {
-                    const file = currentFiles[i];
-                    showProgress((i / currentFiles.length) * 100);
-                    
-                    const text = await file.text();
-                    const data = parseCSV(text);
-                    
-                    // ファイル名からECサイトを判定
-                    const ecSite = detectECSite(file.name, data);
-                    const converted = convertToYamatoFormat(data, ecSite);
-                    
-                    processedData = processedData.concat(converted);
+                let masterSheet = null;
+                // 商品マスタシートを探す
+                for (const sheetName of workbook.SheetNames) {
+                    if (sheetName.includes('商品マスタ') || sheetName.includes('master') || sheetName.includes('Master')) {
+                        masterSheet = workbook.Sheets[sheetName];
+                        console.log('Found master sheet:', sheetName);
+                        break;
+                    }
                 }
                 
-                showProgress(100);
-                showStatus(`${processedData.length}件のデータを取り込みました`, "success");
+                // 見つからない場合は最初のシートを使用
+                if (!masterSheet && workbook.SheetNames.length > 0) {
+                    masterSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    console.log('Using first sheet:', workbook.SheetNames[0]);
+                }
+                
+                if (!masterSheet) {
+                    throw new Error('商品マスタシートが見つかりません');
+                }
+                
+                // シートをJSONに変換
+                const jsonData = XLSX.utils.sheet_to_json(masterSheet, { 
+                    header: 1,
+                    defval: '',
+                    blankrows: false
+                });
+                
+                console.log('Master data rows:', jsonData.length);
+                console.log('Headers:', jsonData[0]);
+                
+                // 商品マスタオブジェクトを構築（複数カラムセット対応）
+                productMaster = {};
+                let loadedCount = 0;
+                
+                for (let i = 1; i < jsonData.length; i++) {
+                    const row = jsonData[i];
+                    if (row.length >= 3 && row[0] && row[2] && row[0] !== 'FBA') { // 販売サイト、商品No最低限必要、FBA除外
+                        const site = String(row[0]).trim();
+                        const detail = String(row[1] || '').trim();
+                        const productNo = String(row[2]).trim();
+                        
+                        // 複数カラムセットを処理（D-F, G-I, J-L, M-O, P-R）
+                        const colorSets = [];
+                        const columnGroups = [
+                            [3, 4, 5],   // D, E, F
+                            [6, 7, 8],   // G, H, I  
+                            [9, 10, 11], // J, K, L
+                            [12, 13, 14], // M, N, O
+                            [15, 16, 17]  // P, Q, R
+                        ];
+                        
+                        columnGroups.forEach(([weightCol, quantityCol, colorCol]) => {
+                            let weight = parseFloat(row[weightCol]) || 0;
+                            const quantity = parseInt(row[quantityCol]) || 0;
+                            const color = String(row[colorCol] || '').trim();
+                            
+                            // カラーオモリ対応表から重量を取得（優先）
+                            if (color && colorWeightTable.byColor && colorWeightTable.byColor[color]) {
+                                weight = colorWeightTable.byColor[color];
+                                console.log(`Using color weight table: ${color} = ${weight}g`);
+                            }
+                            
+                            if (weight > 0 && quantity > 0 && color) {
+                                colorSets.push({
+                                    weight: weight,
+                                    quantity: quantity,
+                                    color: color
+                                });
+                            }
+                        });
+                        
+                        // 少なくとも1つのカラーセットがある場合のみ登録
+                        if (colorSets.length > 0) {
+                            productMaster[productNo] = {
+                                site: site,
+                                detail: detail,
+                                colorSets: colorSets
+                            };
+                            loadedCount++;
+                        }
+                    }
+                }
+                
+                console.log(`Product master loaded: ${loadedCount} products`);
+                
+                // ステータスを更新
+                const masterStatus = document.getElementById('masterStatus');
+                masterStatus.textContent = `✅ 商品マスタ読み込み完了: ${loadedCount}件`;
+                masterStatus.className = 'file-status success';
+                
+            } catch (error) {
+                console.error('商品マスタ読み込みエラー:', error);
+                const masterStatus = document.getElementById('masterStatus');
+                masterStatus.textContent = `❌ 読み込みエラー: ${error.message}`;
+                masterStatus.className = 'file-status';
+                masterStatus.style.color = '#e53e3e';
+                productMaster = {};
+            }
+        }
+
+        function updateConvertButton() {
+            // 商品マスタは必須、他のファイルは少なくとも1つは必要
+            const hasMaster = selectedFiles.master && Object.keys(productMaster).length > 0;
+            const hasData = selectedFiles.amazon || selectedFiles.rakuten || selectedFiles.yahoo;
+            
+            convertButton.disabled = !hasMaster || !hasData;
+            
+            console.log('Button update:', { hasMaster, hasData, disabled: convertButton.disabled });
+        }
+
+        // 変換処理
+        convertButton.addEventListener('click', async () => {
+            try {
+                showProgress();
+                updateProgress(10, 'ファイルを読み込み中...');
+
+                const results = [];
+                
+                // Amazonデータ処理
+                if (selectedFiles.amazon) {
+                    updateProgress(25, 'Amazonデータを解析中...');
+                    const amazonData = await readFileWithEncoding(selectedFiles.amazon);
+                    const amazonOrders = await processAmazonData(amazonData);
+                    results.push(...amazonOrders);
+                }
+
+                // 楽天データ処理
+                if (selectedFiles.rakuten) {
+                    updateProgress(45, '楽天データを解析中...');
+                    const rakutenData = await readFileWithEncoding(selectedFiles.rakuten);
+                    const rakutenOrders = await processRakutenData(rakutenData);
+                    results.push(...rakutenOrders);
+                }
+
+                // Yahooデータ処理
+                if (selectedFiles.yahoo) {
+                    updateProgress(65, 'Yahooデータを解析中...');
+                    const yahooData = await readFileWithEncoding(selectedFiles.yahoo);
+                    const yahooOrders = await processYahooData(yahooData);
+                    results.push(...yahooOrders);
+                }
+
+                // データ統合
+                updateProgress(80, 'データを統合中...');
+                const mergedOrders = mergeOrdersByRecipient(results);
+                
+                updateProgress(90, 'CSV生成中...');
+                const csvContent = generateYamatoCSV(mergedOrders);
+                
+                updateProgress(100, '変換完了!');
                 
                 setTimeout(() => {
-                    document.getElementById('progressBar').style.display = 'none';
-                }, 1000);
-                
+                    // 重量別の統計を計算
+                    const lightOrders = mergedOrders.filter(order => order.weight <= 1000);
+                    const heavyOrders = mergedOrders.filter(order => order.weight > 1000);
+                    
+                    showResult(csvContent, {
+                        original: results.length,
+                        merged: mergedOrders.length,
+                        amazon: results.filter(r => r.source === 'Amazon').length,
+                        rakuten: results.filter(r => r.source === '楽天').length,
+                        yahoo: results.filter(r => r.source === 'Yahoo').length,
+                        lightOrders: lightOrders.length,
+                        heavyOrders: heavyOrders.length,
+                        unknownProducts: []
+                    });
+                }, 500);
+
             } catch (error) {
-                showStatus(`データ取り込みエラー: ${error.message}`, "error");
-                document.getElementById('progressBar').style.display = 'none';
+                console.error('変換エラー:', error);
+                showError(error.message);
             }
-        }
+        });
 
-        // ③取得した発送データを確認
-        function previewData() {
-            if (processedData.length === 0) {
-                showStatus("先にデータを取り込んでください", "error");
-                return;
-            }
-
-            displayDataTable(processedData);
-            showStatus(`${processedData.length}件のデータを表示中`, "info");
-        }
-
-        // ④ヤマト輸送発送データをCSV出力
-        function exportData() {
-            if (processedData.length === 0) {
-                showStatus("出力するデータがありません", "error");
-                return;
-            }
-
-            try {
-                const csvContent = generateYamatoCSV(processedData);
-                downloadCSV(csvContent, `yamato_shipping_${getDateString()}.csv`);
-                showStatus(`${processedData.length}件のデータをCSVファイルに出力しました`, "success");
-            } catch (error) {
-                showStatus(`CSV出力エラー: ${error.message}`, "error");
-            }
-        }
-
-        // CSV解析
-        function parseCSV(text) {
-            // 文字コード判定と変換
-            const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-            const data = lines.map(line => {
-                // CSVパース（簡易版）
-                const result = [];
-                let current = '';
-                let inQuotes = false;
-                
-                for (let i = 0; i < line.length; i++) {
-                    const char = line[i];
-                    if (char === '"') {
-                        inQuotes = !inQuotes;
-                    } else if (char === ',' && !inQuotes) {
-                        result.push(current.trim());
-                        current = '';
-                    } else {
-                        current += char;
+        async function readFileWithEncoding(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const buffer = new Uint8Array(e.target.result);
+                        
+                        // ファイル名で判定してエンコーディングを選択
+                        let result;
+                        if (file.name.includes('楽天') || file.name.includes('rakuten')) {
+                            // 楽天データはShift-JISを優先
+                            try {
+                                result = new TextDecoder('shift-jis', { fatal: false }).decode(buffer);
+                                console.log('Used Shift-JIS encoding for Rakuten data');
+                            } catch {
+                                // Shift-JISでダメならUTF-8を試行
+                                result = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+                                console.log('Fallback to UTF-8 for Rakuten data');
+                            }
+                        } else {
+                            // その他のファイルはUTF-8を優先
+                            try {
+                                result = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+                                console.log('Used UTF-8 encoding');
+                            } catch {
+                                // UTF-8でダメならShift-JISを試行
+                                try {
+                                    result = new TextDecoder('shift-jis', { fatal: false }).decode(buffer);
+                                    console.log('Fallback to Shift-JIS');
+                                } catch {
+                                    // 最後の手段：非厳密なUTF-8
+                                    result = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+                                    console.log('Used non-strict UTF-8 as last resort');
+                                }
+                            }
+                        }
+                        
+                        resolve(result);
+                        
+                    } catch (error) {
+                        reject(error);
                     }
-                }
-                result.push(current.trim());
-                return result;
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
             });
-            
-            return data;
         }
 
-        // ECサイト判定
-        function detectECSite(filename, data) {
-            const name = filename.toLowerCase();
-            if (name.includes('amazon') || name.includes('18208008508020269')) return 'Amazon';
-            if (name.includes('yahoo') || name.includes('yahooall')) return 'Yahoo';
-            if (name.includes('rakuten') || name.includes('楽天') || name.includes('20250630')) return 'Rakuten';
+        async function processAmazonData(amazonData) {
+            const orders = [];
+            const lines = amazonData.split('\n').filter(line => line.trim());
             
-            // ヘッダーから判定
-            if (data.length > 0) {
-                const header = data[0].join('').toLowerCase();
-                if (header.includes('order-id') || header.includes('sku')) return 'Amazon';
-                if (header.includes('orderid') || header.includes('itemid')) return 'Yahoo';
-                if (header.includes('注文番号') || header.includes('商品名')) return 'Rakuten';
-            }
+            if (lines.length <= 1) return orders;
             
-            return 'Unknown';
-        }
-
-        // ヤマト形式への変換
-        function convertToYamatoFormat(data, ecSite) {
-            if (data.length === 0) return [];
+            const headers = lines[0].split('\t');
+            console.log('Amazon headers count:', headers.length);
             
-            const headers = data[0];
-            const rows = data.slice(1);
-            const converted = [];
-            
-            const senderInfo = {
-                phone: document.getElementById('phone').value,
-                zipcode: document.getElementById('zipcode').value,
-                address: document.getElementById('address').value,
-                name: document.getElementById('name').value
-            };
-
-            rows.forEach(row => {
+            for (let i = 1; i < lines.length; i++) {
+                const fields = lines[i].split('\t');
+                if (fields.length < 20) continue; // 最低限のフィールド数チェック
+                
                 try {
-                    let convertedRow;
+                    const sku = fields[11]?.trim();
+                    const productName = fields[13]?.trim();
+                    const quantity = parseInt(fields[14]) || 1;
+                    const recipientName = fields[19]?.trim();
                     
-                    switch (ecSite) {
-                        case 'Amazon':
-                            convertedRow = convertAmazonData(headers, row, senderInfo);
-                            break;
-                        case 'Yahoo':
-                            convertedRow = convertYahooData(headers, row, senderInfo);
-                            break;
-                        case 'Rakuten':
-                            convertedRow = convertRakutenData(headers, row, senderInfo);
-                            break;
-                        default:
-                            convertedRow = convertGenericData(headers, row, senderInfo);
-                    }
+                    // Amazon住所の完全な結合: ship-state + ship-address-1 + ship-address-2 + ship-address-3
+                    const shipState = fields[24]?.trim() || '';
+                    const shipAddress1 = fields[20]?.trim() || '';
+                    const shipAddress2 = fields[21]?.trim() || '';
+                    const shipAddress3 = fields[22]?.trim() || '';
+                    const shipAddress = [shipState, shipAddress1, shipAddress2, shipAddress3]
+                        .filter(addr => addr && addr.trim())
+                        .join('');
                     
-                    if (convertedRow) {
-                        converted.push(convertedRow);
+                    const zipCode = fields[25]?.trim();
+                    const phoneNumber = fields[10]?.trim();
+                    const orderId = fields[0]?.trim();
+                    const orderItemId = fields[1]?.trim();
+
+                    if (!recipientName || !shipAddress || !zipCode || !phoneNumber) continue;
+
+                    // 商品マスタから重量情報取得（複数カラーセット対応）
+                    const masterInfo = productMaster[sku];
+                    let weight = 50 * quantity; // デフォルト重量×注文数
+                    let productDetail = productName;
+
+                    if (masterInfo && masterInfo.colorSets) {
+                        // 総重量計算: 各カラーセットの(重さ×個数)を合計してから注文数を掛ける
+                        let unitTotalWeight = 0;
+                        const detailParts = [];
+                        
+                        masterInfo.colorSets.forEach(set => {
+                            unitTotalWeight += set.weight * set.quantity;
+                            detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                        });
+                        
+                        weight = unitTotalWeight * quantity;
+                        productDetail = detailParts.join(', ');
+                    } else {
+                        // 商品名から重量を推定
+                        const weightMatch = productName?.match(/(\d+)g/);
+                        if (weightMatch) {
+                            weight = parseInt(weightMatch[1]) * quantity;
+                        }
                     }
+
+                    orders.push({
+                        source: 'Amazon',
+                        sku: sku,
+                        productName: productDetail,
+                        quantity: quantity,
+                        recipientName: recipientName,
+                        shipAddress: shipAddress,
+                        zipCode: formatZipCode(zipCode),
+                        phoneNumber: formatPhoneNumber(phoneNumber),
+                        weight: weight,
+                        orderId: `${orderId}:${orderItemId}:${quantity}`
+                    });
                 } catch (error) {
-                    console.warn('行の変換でエラー:', error);
+                    console.error(`Amazon row ${i} error:`, error);
+                }
+            }
+            
+            console.log('Amazon orders processed:', orders.length);
+            return orders;
+        }
+
+        async function processRakutenData(rakutenData) {
+            const orders = [];
+            
+            const parsed = Papa.parse(rakutenData, { 
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: false
+            });
+            
+            if (!parsed.data || parsed.data.length === 0) return orders;
+            
+            console.log('Rakuten headers:', Object.keys(parsed.data[0]));
+            
+            parsed.data.forEach((row, index) => {
+                try {
+                    const orderId = row['注文番号']?.trim();
+                    const itemId = row['商品管理番号']?.trim();
+                    const itemName = row['商品名']?.trim();
+                    const quantity = parseInt(row['個数']) || 1;
+                    const skuInfo = row['SKU情報']?.trim() || ''; // FB列のSKU情報
+                    
+                    const shipLastName = row['送付先姓']?.trim() || '';
+                    const shipFirstName = row['送付先名']?.trim() || '';
+                    const shipName = `${shipLastName} ${shipFirstName}`.trim();
+                    
+                    const shipPhone1 = row['送付先電話番号1']?.trim() || '';
+                    const shipPhone2 = row['送付先電話番号2']?.trim() || '';
+                    const shipPhone3 = row['送付先電話番号3']?.trim() || '';
+                    const phoneNumber = formatPhoneNumber(`${shipPhone1}-${shipPhone2}-${shipPhone3}`);
+                    
+                    const shipZip1 = row['送付先郵便番号1']?.toString().trim() || '';
+                    const shipZip2 = row['送付先郵便番号2']?.toString().trim() || '';
+                    
+                    // 楽天郵便番号: AJ列を3桁、AK列を4桁に0埋め
+                    const paddedZip1 = shipZip1.padStart(3, '0');
+                    const paddedZip2 = shipZip2.padStart(4, '0');
+                    const zipCode = formatZipCode(`${paddedZip1}${paddedZip2}`);
+                    
+                    const shipPref = row['送付先住所都道府県']?.trim() || '';
+                    const shipCity = row['送付先住所郡市区']?.trim() || '';
+                    const shipAddr = row['送付先住所それ以降の住所']?.trim() || '';
+                    const shipApart = row['送付先住所アパートマンション名']?.trim() || '';
+                    
+                    // 楽天住所の完全な結合
+                    const fullAddress = [shipPref, shipCity, shipAddr, shipApart]
+                        .filter(addr => addr && addr.trim())
+                        .join('');
+
+                    if (!shipName || !fullAddress || !zipCode || !phoneNumber || !orderId) return;
+
+                    // 重量計算の新しいロジック
+                    let weight = 50 * quantity; // デフォルト重量×注文数
+                    let productDetail = itemName;
+                    let foundInColorTable = false;
+
+                    // 1. まずSKU情報（FB列）からカラーオモリ対応表を検索
+                    if (skuInfo && colorWeightTable.byRakuten) {
+                        // SKU情報から"カラー:"プレフィックスを除去
+                        let cleanSKU = skuInfo;
+                        if (skuInfo.startsWith('カラー:')) {
+                            cleanSKU = skuInfo.substring(4); // "カラー:"を除去（4文字）
+                        }
+                        
+                        console.log(`Rakuten SKU processing: "${skuInfo}" -> "${cleanSKU}"`);
+                        
+                        // cleanSKUが実質的に商品コードを含んでいるかチェック
+                        if (cleanSKU && cleanSKU.trim() && colorWeightTable.byRakuten[cleanSKU]) {
+                            const colorInfo = colorWeightTable.byRakuten[cleanSKU];
+                            weight = colorInfo.weight * quantity;
+                            productDetail = `${colorInfo.color}: ${colorInfo.weight}g×${quantity}`;
+                            foundInColorTable = true;
+                            console.log(`Rakuten SKU match: ${cleanSKU} -> ${colorInfo.color}: ${colorInfo.weight}g`);
+                        } else {
+                            console.log(`Rakuten SKU not found in table or empty: "${cleanSKU}"`);
+                        }
+                    }
+                    
+                    // 2. SKU情報で見つからない場合、商品管理番号で商品マスタを確認
+                    if (!foundInColorTable) {
+                        console.log(`Using itemId for Rakuten: ${itemId}`);
+                        const masterInfo = productMaster[itemId];
+                        if (masterInfo && masterInfo.colorSets) {
+                            // 複数カラーセット対応
+                            let unitTotalWeight = 0;
+                            const detailParts = [];
+                            
+                            masterInfo.colorSets.forEach(set => {
+                                unitTotalWeight += set.weight * set.quantity;
+                                detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                            });
+                            
+                            weight = unitTotalWeight * quantity;
+                            productDetail = detailParts.join(', ');
+                        } else {
+                            console.log(`Product not found in master: ${itemId}`);
+                            // 商品名から重量推定（最後の手段）
+                            const weightMatch = itemName?.match(/(\d+)g/);
+                            if (weightMatch) {
+                                weight = parseInt(weightMatch[1]) * quantity;
+                            }
+                        }
+                    }
+
+                    orders.push({
+                        source: '楽天',
+                        sku: itemId,
+                        productName: productDetail,
+                        quantity: quantity,
+                        recipientName: shipName,
+                        shipAddress: fullAddress,
+                        zipCode: zipCode,
+                        phoneNumber: phoneNumber,
+                        weight: weight,
+                        orderId: orderId
+                    });
+                } catch (error) {
+                    console.error(`Rakuten row ${index} error:`, error);
                 }
             });
             
-            return converted;
+            console.log('Rakuten orders processed:', orders.length);
+            return orders;
         }
 
-        // Amazon データ変換
-        function convertAmazonData(headers, row, senderInfo) {
-            const getField = (fieldName) => {
-                const index = headers.findIndex(h => h.toLowerCase().includes(fieldName.toLowerCase()));
-                return index >= 0 ? row[index] : '';
-            };
-
-            const recipientName = getField('recipient-name') || getField('ship-name');
-            const recipientAddress1 = getField('ship-address-1');
-            const recipientAddress2 = getField('ship-address-2');
-            const recipientCity = getField('ship-city');
-            const recipientState = getField('ship-state');
-            const recipientZip = getField('ship-postal-code');
-            const productName = getField('product-name');
-            const quantity = getField('quantity-purchased') || getField('quantity-shipped');
-
-            // 商品情報の検索
-            const productInfo = findProductInfo(productName);
-            const totalWeight = calculateTotalWeight(productInfo, quantity);
-
-            return [
-                '0', // 送り状種類（発払い）
-                formatDate(new Date()), // 出荷予定日
-                '', // お届け予定日
-                '', // 配達時間帯
-                '', // お届け先電話番号（Amazonでは通常提供されない）
-                formatZipCode(recipientZip),
-                `${recipientState}${recipientCity}${recipientAddress1}`,
-                recipientAddress2 || '',
-                recipientName,
-                senderInfo.phone,
-                senderInfo.zipcode,
-                senderInfo.address,
-                senderInfo.name,
-                productInfo.simpleName || productName.substring(0, 25),
-                totalWeight || '',
-                productName,
-                '', // 不明品名
-                getField('order-id') || getField('order-item-id')
-            ];
-        }
-
-        // Yahoo データ変換
-        function convertYahooData(headers, row, senderInfo) {
-            const getField = (fieldName) => {
-                const index = headers.findIndex(h => h.toLowerCase().includes(fieldName.toLowerCase()));
-                return index >= 0 ? row[index] : '';
-            };
-
-            const shipName = getField('shipname') || getField('billname');
-            const shipAddress1 = getField('shipaddress1') || getField('billaddress1');
-            const shipAddress2 = getField('shipaddress2') || getField('billaddress2');
-            const shipCity = getField('shipcity') || getField('billcity');
-            const shipPrefecture = getField('shipprefecture') || getField('billprefecture');
-            const shipZipCode = getField('shipzipcode') || getField('billzipcode');
-            const title = getField('title');
-            const quantity = getField('quantitydetail') || 1;
-
-            // 商品情報の検索
-            const productInfo = findProductInfo(title);
-            const totalWeight = calculateTotalWeight(productInfo, quantity);
-
-            return [
-                '0', // 送り状種類
-                formatDate(new Date()),
-                '',
-                '',
-                '',
-                formatZipCode(shipZipCode),
-                `${shipPrefecture}${shipCity}${shipAddress1}`,
-                shipAddress2 || '',
-                shipName,
-                senderInfo.phone,
-                senderInfo.zipcode,
-                senderInfo.address,
-                senderInfo.name,
-                productInfo.simpleName || title.substring(0, 25),
-                totalWeight || '',
-                title,
-                '',
-                getField('orderid') || getField('id')
-            ];
-        }
-
-        // 楽天データ変換
-        function convertRakutenData(headers, row, senderInfo) {
-            const getField = (fieldName) => {
-                const index = headers.findIndex(h => h.includes(fieldName));
-                return index >= 0 ? row[index] : '';
-            };
-
-            const deliveryName = getField('配送先名') || getField('注文者名');
-            const deliveryZip1 = getField('配送先郵便番号1');
-            const deliveryZip2 = getField('配送先郵便番号2');
-            const deliveryPrefecture = getField('配送先都道府県');
-            const deliveryCity = getField('配送先市区町村');
-            const deliveryAddress1 = getField('配送先住所1');
-            const deliveryAddress2 = getField('配送先住所2') || '';
-            const productName = getField('商品名');
-            const quantity = getField('個数') || getField('数量') || 1;
-
-            const productInfo = findProductInfo(productName);
-            const totalWeight = calculateTotalWeight(productInfo, quantity);
-
-            return [
-                '0',
-                formatDate(new Date()),
-                '',
-                '',
-                '',
-                `${deliveryZip1}-${deliveryZip2}`,
-                `${deliveryPrefecture}${deliveryCity}${deliveryAddress1}`,
-                deliveryAddress2,
-                deliveryName,
-                senderInfo.phone,
-                senderInfo.zipcode,
-                senderInfo.address,
-                senderInfo.name,
-                productInfo.simpleName || productName.substring(0, 25),
-                totalWeight || '',
-                productName,
-                '',
-                getField('注文番号') || getField('伝票番号')
-            ];
-        }
-
-        // 汎用データ変換
-        function convertGenericData(headers, row, senderInfo) {
-            // 基本的な変換ロジック
-            return [
-                '0',
-                formatDate(new Date()),
-                '', '', '', '', '', '', '',
-                senderInfo.phone,
-                senderInfo.zipcode,
-                senderInfo.address,
-                senderInfo.name,
-                '商品', '', '', '', ''
-            ];
-        }
-
-        // 商品情報検索
-        function findProductInfo(productName) {
-            if (!productName || productMaster.length <= 1) {
-                return { simpleName: '商品', weight: 0, quantity: 1 };
-            }
-
-            const searchName = productName.toLowerCase();
+        async function processYahooData(yahooData) {
+            const orders = [];
             
-            for (let i = 1; i < productMaster.length; i++) {
-                const product = productMaster[i];
-                const productDetail = (product[1] || '').toLowerCase();
-                const productNo = (product[2] || '').toLowerCase();
-                
-                if (searchName.includes(productNo) || productDetail.includes(searchName.substring(0, 10))) {
-                    return {
-                        simpleName: 'メタルジグ',
-                        weight: product[3] || 0,
-                        quantity: product[4] || 1,
-                        color: product[5] || ''
-                    };
+            const parsed = Papa.parse(yahooData, { 
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: false
+            });
+            
+            if (!parsed.data || parsed.data.length === 0) return orders;
+            
+            console.log('Yahoo headers:', Object.keys(parsed.data[0]));
+            
+            parsed.data.forEach((row, index) => {
+                try {
+                    const orderId = row['OrderId']?.trim();
+                    let itemId = row['ItemId']?.trim();
+                    const subCode = row['SubCode']?.trim() || ''; // SubCode追加
+                    const title = row['Title']?.trim();
+                    const quantityDetail = row['QuantityDetail']?.trim();
+                    const shipName = row['ShipName']?.trim();
+                    const shipAddress1 = row['ShipAddress1']?.trim() || '';
+                    const shipAddress2 = row['ShipAddress2']?.trim() || '';
+                    const shipCity = row['ShipCity']?.trim() || '';
+                    const shipPrefecture = row['ShipPrefecture']?.trim() || '';
+                    const shipAddressFull = row['ShipAddressFull']?.trim() || '';
+                    
+                    // Yahoo住所: ShipAddressFullを優先、なければ個別フィールドを結合
+                    const shipAddress = shipAddressFull || 
+                        [shipPrefecture, shipCity, shipAddress1, shipAddress2]
+                            .filter(addr => addr && addr.trim())
+                            .join('');
+                    
+                    const shipZip = row['ShipZipCode']?.toString().trim();
+                    const shipPhone = formatPhoneNumber(row['ShipPhoneNumber']?.toString().trim());
+
+                    if (!shipName || !shipAddress || !shipZip || !shipPhone || !orderId) return;
+
+                    // 重量計算の新しいロジック
+                    let totalWeight = 0;
+                    let productDetails = [];
+                    let totalQuantity = 0;
+                    let foundInColorTable = false;
+
+                    // 1. まずSubCodeからカラーオモリ対応表を検索
+                    if (subCode && colorWeightTable.byYahoo) {
+                        console.log(`Processing Yahoo SubCode: ${subCode}`);
+                        
+                        if (subCode.includes('&')) {
+                            // 複数商品の場合（例: L1=greenmix60&L2=yellowgreen80）
+                            const items = subCode.split('&');
+                            items.forEach(item => {
+                                // L1=greenmix60 -> greenmix60 を抽出
+                                let cleanItemCode = '';
+                                if (item.includes('=')) {
+                                    cleanItemCode = item.split('=')[1]; // = より後ろを取得
+                                } else {
+                                    cleanItemCode = item.trim();
+                                }
+                                
+                                console.log(`Yahoo multiple SubCode item: ${item} -> ${cleanItemCode}`);
+                                
+                                // cleanItemCodeが実質的に商品コードを含んでいるかチェック
+                                if (cleanItemCode && cleanItemCode.trim() && colorWeightTable.byYahoo[cleanItemCode]) {
+                                    const colorInfo = colorWeightTable.byYahoo[cleanItemCode];
+                                    
+                                    // QuantityDetailから該当商品の数量を取得（例: greenmix60:2,yellowgreen80:1）
+                                    let quantity = 1;
+                                    if (quantityDetail) {
+                                        const quantityMatch = quantityDetail.match(new RegExp(`${cleanItemCode}:(\\d+)`));
+                                        quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+                                    }
+                                    
+                                    const itemTotalWeight = colorInfo.weight * quantity;
+                                    totalWeight += itemTotalWeight;
+                                    productDetails.push(`${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
+                                    totalQuantity += quantity;
+                                    foundInColorTable = true;
+                                    
+                                    console.log(`Yahoo SubCode match: ${cleanItemCode} -> ${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
+                                } else {
+                                    console.log(`Yahoo SubCode not found in table or empty: ${cleanItemCode}`);
+                                }
+                            });
+                        } else {
+                            // 単一商品の場合（例: L1=greenmix60）
+                            const quantity = parseInt(quantityDetail) || 1;
+                            
+                            // 単一商品でも = より後ろを取得
+                            let cleanItemCode = subCode;
+                            if (subCode.includes('=')) {
+                                cleanItemCode = subCode.split('=')[1]; // = より後ろを取得
+                            }
+                            
+                            console.log(`Yahoo single SubCode: ${subCode} -> ${cleanItemCode}`);
+                            
+                            // cleanItemCodeが実質的に商品コードを含んでいるかチェック
+                            if (cleanItemCode && cleanItemCode.trim() && colorWeightTable.byYahoo[cleanItemCode]) {
+                                const colorInfo = colorWeightTable.byYahoo[cleanItemCode];
+                                totalWeight = colorInfo.weight * quantity;
+                                productDetails.push(`${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
+                                totalQuantity = quantity;
+                                foundInColorTable = true;
+                                console.log(`Yahoo SubCode match: ${cleanItemCode} -> ${colorInfo.color}: ${colorInfo.weight}g×${quantity}`);
+                            } else {
+                                console.log(`Yahoo SubCode not found in table or empty: ${cleanItemCode}`);
+                            }
+                        }
+                    }
+                    
+                    // 2. SubCodeで見つからない場合、ItemIdで商品マスタを確認
+                    if (!foundInColorTable) {
+                        console.log(`SubCode not found, using ItemId: ${itemId}`);
+                        
+                        if (itemId?.includes('&')) {
+                            // 複数商品の場合（例: L1=bara60&L2=bara80）
+                            const items = itemId.split('&');
+                            items.forEach(item => {
+                                // L1=bara60 -> bara60 を抽出
+                                let cleanItemCode = '';
+                                if (item.includes('=')) {
+                                    cleanItemCode = item.split('=')[1]; // = より後ろを取得
+                                } else {
+                                    cleanItemCode = item.trim();
+                                }
+                                
+                                console.log(`Yahoo multiple item: ${item} -> ${cleanItemCode}`);
+                                
+                                // QuantityDetailから該当商品の数量を取得（例: bara60:2,bara80:1）
+                                let quantity = 1;
+                                if (quantityDetail) {
+                                    const quantityMatch = quantityDetail.match(new RegExp(`${cleanItemCode}:(\\d+)`));
+                                    quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+                                }
+                                
+                                const masterInfo = productMaster[cleanItemCode];
+                                console.log(`Searching for ${cleanItemCode}:`, masterInfo);
+                                
+                                if (masterInfo && masterInfo.colorSets) {
+                                    // 複数カラーセット対応
+                                    let itemUnitWeight = 0;
+                                    const itemDetailParts = [];
+                                    
+                                    masterInfo.colorSets.forEach(set => {
+                                        itemUnitWeight += set.weight * set.quantity;
+                                        itemDetailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                                    });
+                                    
+                                    const itemTotalWeight = itemUnitWeight * quantity;
+                                    totalWeight += itemTotalWeight;
+                                    productDetails.push(itemDetailParts.join(', '));
+                                    totalQuantity += quantity;
+                                } else {
+                                    console.log(`Product not found in master: ${cleanItemCode}`);
+                                    totalWeight += 50 * quantity;
+                                    productDetails.push(`不明商品: ${cleanItemCode}`);
+                                    totalQuantity += quantity;
+                                }
+                            });
+                        } else {
+                            // 単一商品の場合（例: L1=bara60）
+                            const quantity = parseInt(quantityDetail) || 1;
+                            
+                            // 単一商品でも = より後ろを取得
+                            let cleanItemCode = itemId;
+                            if (itemId && itemId.includes('=')) {
+                                cleanItemCode = itemId.split('=')[1]; // = より後ろを取得
+                            }
+                            
+                            console.log(`Yahoo single item: ${itemId} -> ${cleanItemCode}`);
+                            const masterInfo = productMaster[cleanItemCode];
+                            console.log(`Searching for ${cleanItemCode}:`, masterInfo);
+                            
+                            if (masterInfo && masterInfo.colorSets) {
+                                // 複数カラーセット対応
+                                let unitTotalWeight = 0;
+                                const detailParts = [];
+                                
+                                masterInfo.colorSets.forEach(set => {
+                                    unitTotalWeight += set.weight * set.quantity;
+                                    detailParts.push(`${set.color}: ${set.weight}g×${set.quantity}`);
+                                });
+                                
+                                totalWeight = unitTotalWeight * quantity;
+                                productDetails.push(detailParts.join(', '));
+                            } else {
+                                console.log(`Product not found in master: ${cleanItemCode}`);
+                                // 商品マスタにない場合、タイトルから重量推定
+                                const weightMatch = title?.match(/(\d+)g/);
+                                totalWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
+                                productDetails.push(`不明商品: ${cleanItemCode}`);
+                            }
+                            totalQuantity = quantity;
+                        }
+                    }
+
+                    orders.push({
+                        source: 'Yahoo',
+                        sku: itemId,
+                        productName: productDetails.join(', '),
+                        quantity: totalQuantity,
+                        recipientName: shipName,
+                        shipAddress: shipAddress,
+                        zipCode: formatZipCode(shipZip),
+                        phoneNumber: shipPhone,
+                        weight: totalWeight,
+                        orderId: orderId
+                    });
+                } catch (error) {
+                    console.error(`Yahoo row ${index} error:`, error);
                 }
+            });
+            
+            console.log('Yahoo orders processed:', orders.length);
+            return orders;
+        }
+
+        function mergeOrdersByRecipient(orders) {
+            const merged = {};
+            
+            orders.forEach(order => {
+                const key = `${order.recipientName}_${order.shipAddress}_${order.phoneNumber}`;
+                
+                if (merged[key]) {
+                    merged[key].weight += order.weight;
+                    merged[key].quantity += order.quantity;
+                    merged[key].orderId += `,${order.orderId}`;
+                    
+                    if (!merged[key].productName.includes(order.productName)) {
+                        merged[key].productName += `, ${order.productName}`;
+                    }
+                } else {
+                    merged[key] = { ...order };
+                }
+            });
+            
+            return Object.values(merged);
+        }
+
+        function formatPhoneNumber(phone) {
+            if (!phone) return '';
+            
+            const cleaned = phone.replace(/[^\d]/g, '');
+            const withZero = cleaned.startsWith('0') ? cleaned : '0' + cleaned;
+            
+            if (withZero.length === 10) {
+                return `${withZero.substr(0, 3)}-${withZero.substr(3, 3)}-${withZero.substr(6, 4)}`;
+            } else if (withZero.length === 11) {
+                return `${withZero.substr(0, 3)}-${withZero.substr(3, 4)}-${withZero.substr(7, 4)}`;
             }
-
-            // 重量を商品名から推定
-            const weightMatch = productName.match(/(\d+)g/);
-            const weight = weightMatch ? parseInt(weightMatch[1]) : 0;
-
-            return {
-                simpleName: 'メタルジグ',
-                weight: weight,
-                quantity: 1,
-                color: ''
-            };
+            
+            return withZero;
         }
 
-        // 総重量計算
-        function calculateTotalWeight(productInfo, quantity) {
-            const qty = parseInt(quantity) || 1;
-            const weight = productInfo.weight || 0;
-            const productQty = productInfo.quantity || 1;
-            return weight * productQty * qty;
-        }
-
-        // 日付フォーマット
-        function formatDate(date) {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}/${month}/${day}`;
-        }
-
-        // 郵便番号フォーマット
         function formatZipCode(zipCode) {
             if (!zipCode) return '';
+            
             const cleaned = zipCode.replace(/[^\d]/g, '');
-            if (cleaned.length === 7) {
-                return `${cleaned.substring(0, 3)}-${cleaned.substring(3)}`;
+            
+            // 楽天の郵便番号修正処理
+            if (cleaned.length === 5) {
+                if (cleaned.startsWith('133') && cleaned.endsWith('55')) {
+                    return '133-0055';
+                }
+                if (cleaned.startsWith('590') && cleaned.endsWith('06')) {
+                    return '590-0006';
+                }
             }
-            return zipCode;
+            
+            if (cleaned.length === 7) {
+                return `${cleaned.substr(0, 3)}-${cleaned.substr(3, 4)}`;
+            }
+            
+            return cleaned;
         }
 
-        // 日付文字列生成
-        function getDateString() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            return `${year}${month}${day}`;
-        }
-
-        // データテーブル表示
-        function displayDataTable(data) {
-            if (data.length === 0) return;
-
+        function generateYamatoCSV(orders) {
             const headers = [
-                '送り状種類', '出荷予定日', 'お届け予定日', '配達時間帯',
-                'お届け先電話番号', 'お届け先郵便番号', 'お届け先住所',
-                'お届け先アパートマンション名', 'お届け先名',
-                'ご依頼主電話番号', 'ご依頼主郵便番号', 'ご依頼主住所', 'ご依頼主名',
-                '品名', '総重量(g)', '品名詳細', '不明品名', '販売ID'
+                '送り状種類','出荷予定日','お届け予定日','配達時間帯','お届け先電話番号',
+                'お届け先郵便番号','お届け先住所','お届け先アパートマンション名','お届け先名',
+                'ご依頼主電話番号','ご依頼主郵便番号','ご依頼主住所','ご依頼主名','品名１',
+                '総重量(g)','品名詳細','不明品名','販売ID','',''
             ];
 
-            let html = '<tr>';
-            headers.forEach(header => {
-                html += `<th>${header}</th>`;
-            });
-            html += '</tr>';
+            const rows = [headers.join(',')];
+            
+            const today = new Date();
+            const shipDate = `${today.getFullYear()}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getDate().toString().padStart(2, '0')}`;
 
-            document.getElementById('tableHeader').innerHTML = html;
-
-            let bodyHtml = '';
-            data.slice(0, 100).forEach(row => { // 最初の100行のみ表示
-                bodyHtml += '<tr>';
-                row.forEach(cell => {
-                    bodyHtml += `<td>${cell || ''}</td>`;
+            // 重量で分類（1kg以下と1kg超過）
+            const lightOrders = orders.filter(order => order.weight <= 1000);
+            const heavyOrders = orders.filter(order => order.weight > 1000);
+            
+            // すべての注文を処理する関数
+            const processOrders = (orderList, shipType) => {
+                orderList.forEach(order => {
+                    const escapeCSV = (str) => {
+                        if (!str) return '';
+                        const strValue = String(str);
+                        if (strValue.includes(',') || strValue.includes('"') || strValue.includes('\n')) {
+                            return '"' + strValue.replace(/"/g, '""') + '"';
+                        }
+                        return strValue;
+                    };
+                    
+                    const fullProductName = order.productName || '';
+                    const truncatedProductName = fullProductName.substring(0, 25); // 全角25文字制限
+                    const hasOverflow = fullProductName.length > 25;
+                    
+                    const row = [
+                        shipType, // 送り状種類：A（1kg以下）またはZ（1kg超過）
+                        shipDate,
+                        '', // お届け予定日
+                        '', // 配達時間帯
+                        escapeCSV(order.phoneNumber),
+                        escapeCSV(order.zipCode),
+                        escapeCSV(order.shipAddress),
+                        '', // アパートマンション名
+                        escapeCSV(order.recipientName),
+                        '050-3590-1444', // JGSフィッシュ電話番号
+                        '104-0061', // JGSフィッシュ郵便番号
+                        '東京都中央区銀座1-22-11 2F', // JGSフィッシュ住所
+                        order.source === 'Amazon' ? 'JGSフィッシュ (Amazon店)' :
+                        order.source === '楽天' ? 'JGSフィッシュ (楽天市場店)' :
+                        order.source === 'Yahoo' ? 'JGSフィッシュ (yahoo!ｼｮｯﾋﾟﾝｸﾞ店)' :
+                        'JGSフィッシュ', // ご依頼主名（ECサイト別）
+                        escapeCSV(truncatedProductName), // 品名１（全角25文字制限）
+                        Math.round(order.weight || 50),
+                        hasOverflow ? escapeCSV(fullProductName) : '', // 品名詳細（オーバーフロー時は完全版）
+                        '', // 不明品名
+                        escapeCSV(order.orderId),
+                        '', ''
+                    ];
+                    rows.push(row.join(','));
                 });
-                bodyHtml += '</tr>';
-            });
+            };
 
-            document.getElementById('tableBody').innerHTML = bodyHtml;
-            document.getElementById('dataTable').style.display = 'block';
+            // 1kg以下の注文を先に処理（送り状種類：A）
+            processOrders(lightOrders, 'A');
+            
+            // 1kg超過の注文を最下部に処理（送り状種類：Z）
+            processOrders(heavyOrders, 'Z');
+
+            return rows.join('\r\n');
         }
 
-        // ヤマトCSV生成
-        function generateYamatoCSV(data) {
-            const headers = [
-                '送り状種類', '出荷予定日', 'お届け予定日', '配達時間帯',
-                'お届け先電話番号', 'お届け先郵便番号', 'お届け先住所',
-                'お届け先アパートマンション名', 'お届け先名',
-                'ご依頼主電話番号', 'ご依頼主郵便番号', 'ご依頼主住所', 'ご依頼主名',
-                '品名１', '総重量(g)', '品名詳細', '不明品名', '販売ID'
-            ];
-
-            let csv = headers.join(',') + '\n';
-            
-            data.forEach(row => {
-                const escapedRow = row.map(cell => {
-                    const str = String(cell || '');
-                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-                        return `"${str.replace(/"/g, '""')}"`;
-                    }
-                    return str;
-                });
-                csv += escapedRow.join(',') + '\n';
-            });
-
-            return csv;
+        function showProgress() {
+            document.querySelector('.upload-section').style.display = 'none';
+            convertButton.style.display = 'none';
+            progressSection.style.display = 'block';
+            resultSection.style.display = 'none';
         }
 
-        // CSV ダウンロード
-        function downloadCSV(content, filename) {
-            const bom = '\uFEFF'; // UTF-8 BOM
-            const blob = new Blob([bom + content], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
+        function updateProgress(percent, text) {
+            progressFill.style.width = percent + '%';
+            progressText.textContent = text;
+        }
+
+        function showResult(csvContent, stats) {
+            progressSection.style.display = 'none';
+            resultSection.style.display = 'block';
             
-            if (link.download !== undefined) {
+            // 重量別の統計を計算
+            const lightCount = stats.lightOrders || 0;
+            const heavyCount = stats.heavyOrders || 0;
+            
+            messageArea.innerHTML = `
+                <div class="success-message">
+                    <strong>🎉 変換完了！</strong><br>
+                    ${stats.original}件のデータを${stats.merged}件にまとめてヤマト運輸形式に変換しました。
+                </div>
+                
+                <div class="summary-stats">
+                    <div class="stat-box">
+                        <div class="stat-number">${stats.amazon}</div>
+                        <div class="stat-label">Amazon</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">${stats.rakuten}</div>
+                        <div class="stat-label">楽天</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">${stats.yahoo}</div>
+                        <div class="stat-label">Yahoo</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">${stats.merged}</div>
+                        <div class="stat-label">最終件数</div>
+                    </div>
+                </div>
+                
+                <div class="summary-stats">
+                    <div class="stat-box">
+                        <div class="stat-number">${lightCount}</div>
+                        <div class="stat-label">1kg以下 (A)</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">${heavyCount}</div>
+                        <div class="stat-label">1kg超過 (Z)</div>
+                    </div>
+                </div>
+            `;
+            
+            downloadButton.style.display = 'block';
+            window.csvData = csvContent;
+            
+            downloadButton.onclick = () => downloadCSV(csvContent, stats.merged);
+        }
+
+        function downloadCSV(csvContent, recordCount) {
+            try {
+                const BOM = '\uFEFF';
+                const csvWithBOM = BOM + csvContent;
+                const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+                
+                const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', filename);
-                link.style.visibility = 'hidden';
+                link.href = url;
+                link.download = `YBMdata_${getCurrentDateString()}.csv`;
+                link.style.display = 'none';
+                
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+                
+                downloadButton.textContent = '✅ ダウンロード完了！';
+                downloadButton.style.background = '#218838';
+                
+            } catch (error) {
+                console.error('ダウンロードエラー:', error);
+                alert('ダウンロードに失敗しました。ブラウザの設定を確認してください。');
             }
         }
 
-        // ステータス表示
-        function showStatus(message, type) {
-            const statusDiv = document.getElementById('statusMessage');
-            statusDiv.className = `status-message status-${type}`;
-            statusDiv.textContent = message;
-            statusDiv.style.display = 'block';
-
-            if (type === 'success' || type === 'info') {
-                setTimeout(() => {
-                    statusDiv.style.display = 'none';
-                }, 5000);
-            }
+        function getCurrentDateString() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            return `${year}${month}${day}`;
         }
 
-        // プログレスバー表示
-        function showProgress(percentage) {
-            const progressBar = document.getElementById('progressBar');
-            const progressFill = document.getElementById('progressFill');
+        function showError(message) {
+            progressSection.style.display = 'none';
+            resultSection.style.display = 'block';
             
-            progressBar.style.display = 'block';
-            progressFill.style.width = `${percentage}%`;
+            messageArea.innerHTML = `
+                <div class="error-message">
+                    <strong>❌ エラーが発生しました</strong><br>
+                    ${message}<br><br>
+                    <small>確認項目：<br>
+                    • 商品マスタファイルが正しく選択されているか<br>
+                    • ファイル形式が正しいか（Amazon: TSV、楽天・Yahoo: CSV）<br>
+                    • ファイルが破損していないか</small>
+                </div>
+            `;
+            
+            downloadButton.style.display = 'none';
         }
 
-        // XLSX ライブラリを動的に読み込み
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        document.head.appendChild(script);
+        // リセット処理
+        resetButton.addEventListener('click', () => {
+            // ファイル選択をリセット
+            masterFile.value = '';
+            amazonFile.value = '';
+            rakutenFile.value = '';
+            yahooFile.value = '';
+            
+            selectedFiles = { master: null, amazon: null, rakuten: null, yahoo: null };
+            productMaster = {};
+            
+            // ステータスをリセット
+            const statusElements = [
+                { id: 'masterStatus', text: '商品マスタファイル(.xlsx/.xlsm)を選択してください' },
+                { id: 'amazonStatus', text: 'ファイルを選択してください' },
+                { id: 'rakutenStatus', text: 'ファイルを選択してください' },
+                { id: 'yahooStatus', text: 'ファイルを選択してください' }
+            ];
+            
+            statusElements.forEach(({ id, text }) => {
+                const element = document.getElementById(id);
+                element.textContent = text;
+                element.className = 'file-status';
+                element.style.color = '';
+            });
+            
+            // インプット要素のクラスをリセット
+            [masterFile, amazonFile, rakutenFile, yahooFile].forEach(input => {
+                input.classList.remove('has-file');
+            });
+            
+            // セクション表示をリセット
+            document.querySelector('.upload-section').style.display = 'block';
+            convertButton.style.display = 'block';
+            convertButton.textContent = 'データを変換してダウンロード';
+            progressSection.style.display = 'none';
+            resultSection.style.display = 'none';
+            
+            downloadButton.textContent = 'ヤマト運輸用CSVをダウンロード';
+            downloadButton.style.background = '#28a745';
+            
+            updateConvertButton();
+        });
+
+        // 初期化処理
+        async function initialize() {
+            console.log('Initializing application...');
+            
+            // カラーオモリ対応表を自動読み込み
+            const colorTableLoaded = await loadColorWeightTable();
+            
+            if (colorTableLoaded) {
+                console.log('✅ カラーオモリ対応表の読み込み完了');
+            } else {
+                console.log('⚠️ カラーオモリ対応表の読み込みに失敗（処理は継続）');
+            }
+            
+            updateConvertButton();
+        }
+
+        // 初期化実行
+        initialize();
     </script>
 </body>
 </html>
