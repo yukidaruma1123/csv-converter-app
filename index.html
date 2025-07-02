@@ -1467,38 +1467,8 @@
             
             messageArea.innerHTML = `
                 <div class="success-message">
-                    <strong>🎉 変換完了！</strong><br>
-                    ${stats.original}件のデータを${stats.merged}件にまとめてヤマト運輸形式に変換しました。
-                </div>
-                
-                <div class="summary-stats">
-                    <div class="stat-box">
-                        <div class="stat-number">${stats.amazon}</div>
-                        <div class="stat-label">Amazon</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-number">${stats.rakuten}</div>
-                        <div class="stat-label">楽天</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-number">${stats.yahoo}</div>
-                        <div class="stat-label">Yahoo</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-number">${stats.merged}</div>
-                        <div class="stat-label">最終件数</div>
-                    </div>
-                </div>
-                
-                <div class="summary-stats">
-                    <div class="stat-box">
-                        <div class="stat-number">${lightCount}</div>
-                        <div class="stat-label">1kg以下 (A)</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-number">${heavyCount}</div>
-                        <div class="stat-label">1kg超過 (Z)</div>
-                    </div>
+                    <strong>変換完了</strong><br>
+                    1kg超過: ${heavyCount}件
                 </div>
             `;
             
