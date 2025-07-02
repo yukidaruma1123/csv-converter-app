@@ -1160,67 +1160,72 @@
                     merged[key].orderId += `,${order.orderId}`;
                     
                     // 商品名の統合処理を改善
+                    // 既存と新規の全商品を一つのリストに統合
+                    const allProducts = [];
+                    
+                    // 既存商品を追加
                     const existingProducts = merged[key].productName.split(', ');
+                    allProducts.push(...existingProducts);
+                    
+                    // 新商品を追加
                     const newProducts = order.productName.split(', ');
+                    allProducts.push(...newProducts);
                     
-                    // 各新商品について処理
-                    newProducts.forEach(newProduct => {
-                        // 商品名から重量と数量の情報を抽出（例: "銀: 80g×3"）
-                        const newMatch = newProduct.match(/^(.+?):\s*(\d+)g×(\d+)$/);
-                        if (newMatch) {
-                            const [, newColor, newWeight, newQty] = newMatch;
-                            let found = false;
-                            
-                            // 既存商品の中で同じ色・重量の商品を探す
-                            for (let i = 0; i < existingProducts.length; i++) {
-                                const existingMatch = existingProducts[i].match(/^(.+?):\s*(\d+)g×(\d+)$/);
-                                if (existingMatch) {
-                                    const [, existingColor, existingWeight, existingQty] = existingMatch;
-                                    
-                                    // 同じ色・重量の商品が見つかった場合、数量を統合
-                                    if (newColor === existingColor && newWeight === existingWeight) {
-                                        const totalQty = parseInt(existingQty) + parseInt(newQty);
-                                        existingProducts[i] = `${newColor}: ${newWeight}g×${totalQty}`;
-                                        found = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            // 同じ商品が見つからなかった場合、新しい商品として追加
-                            if (!found) {
-                                existingProducts.push(newProduct);
-                            }
-                        } else {
-                            // パターンにマッチしない商品名（不明商品など）は重複チェックして追加
-                            if (!existingProducts.includes(newProduct)) {
-                                existingProducts.push(newProduct);
-                            }
-                        }
-                    });
+                    // すべての商品を解析して統合
+                    const productMap = {};
                     
-                    // 統合した商品名を更新
-                    // 色名の省略処理を追加
-                    const finalProducts = [];
-                    const colorGroups = {};
-                    
-                    // 色ごとにグループ化
-                    existingProducts.forEach(product => {
+                    allProducts.forEach(product => {
                         const match = product.match(/^(.+?):\s*(\d+)g×(\d+)$/);
                         if (match) {
                             const [, color, weight, qty] = match;
-                            if (!colorGroups[color]) {
-                                colorGroups[color] = [];
+                            const key = `${color}:${weight}`;
+                            
+                            if (productMap[key]) {
+                                // 既存の商品があれば数量を加算
+                                productMap[key].qty += parseInt(qty);
+                            } else {
+                                // 新しい商品として登録
+                                productMap[key] = {
+                                    color: color,
+                                    weight: parseInt(weight),
+                                    qty: parseInt(qty)
+                                };
                             }
-                            colorGroups[color].push({ weight: parseInt(weight), qty: parseInt(qty), original: product });
                         } else {
-                            // パターンにマッチしない商品はそのまま追加
-                            finalProducts.push(product);
+                            // パターンにマッチしない商品（不明商品など）
+                            const unknownKey = `unknown:${product}`;
+                            if (!productMap[unknownKey]) {
+                                productMap[unknownKey] = {
+                                    original: product,
+                                    isUnknown: true
+                                };
+                            }
                         }
                     });
                     
+                    // 色ごとにグループ化して表示用に整理
+                    const colorGroups = {};
+                    const unknownProducts = [];
+                    
+                    Object.values(productMap).forEach(item => {
+                        if (item.isUnknown) {
+                            unknownProducts.push(item.original);
+                        } else {
+                            if (!colorGroups[item.color]) {
+                                colorGroups[item.color] = [];
+                            }
+                            colorGroups[item.color].push({
+                                weight: item.weight,
+                                qty: item.qty
+                            });
+                        }
+                    });
+                    
+                    // 最終的な商品名リストを作成
+                    const finalProducts = [];
+                    
                     // 色ごとに重量順でソートし、2番目以降は色名を省略
-                    Object.keys(colorGroups).forEach(color => {
+                    Object.keys(colorGroups).sort().forEach(color => {
                         const items = colorGroups[color].sort((a, b) => a.weight - b.weight);
                         items.forEach((item, index) => {
                             if (index === 0) {
@@ -1232,6 +1237,9 @@
                             }
                         });
                     });
+                    
+                    // 不明商品を最後に追加
+                    finalProducts.push(...unknownProducts);
                     
                     merged[key].productName = finalProducts.join(', ');
                 } else {
