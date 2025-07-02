@@ -1200,7 +1200,40 @@
                     });
                     
                     // 統合した商品名を更新
-                    merged[key].productName = existingProducts.join(', ');
+                    // 色名の省略処理を追加
+                    const finalProducts = [];
+                    const colorGroups = {};
+                    
+                    // 色ごとにグループ化
+                    existingProducts.forEach(product => {
+                        const match = product.match(/^(.+?):\s*(\d+)g×(\d+)$/);
+                        if (match) {
+                            const [, color, weight, qty] = match;
+                            if (!colorGroups[color]) {
+                                colorGroups[color] = [];
+                            }
+                            colorGroups[color].push({ weight: parseInt(weight), qty: parseInt(qty), original: product });
+                        } else {
+                            // パターンにマッチしない商品はそのまま追加
+                            finalProducts.push(product);
+                        }
+                    });
+                    
+                    // 色ごとに重量順でソートし、2番目以降は色名を省略
+                    Object.keys(colorGroups).forEach(color => {
+                        const items = colorGroups[color].sort((a, b) => a.weight - b.weight);
+                        items.forEach((item, index) => {
+                            if (index === 0) {
+                                // 最初のアイテムは色名付き
+                                finalProducts.push(`${color}: ${item.weight}g×${item.qty}`);
+                            } else {
+                                // 2番目以降は色名省略
+                                finalProducts.push(`${item.weight}g×${item.qty}`);
+                            }
+                        });
+                    });
+                    
+                    merged[key].productName = finalProducts.join(', ');
                 } else {
                     merged[key] = { ...order };
                 }
