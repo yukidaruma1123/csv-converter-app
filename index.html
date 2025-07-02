@@ -1175,33 +1175,63 @@
                     const productMap = {};
                     
                     allProducts.forEach(product => {
-                        const match = product.match(/^(.+?):\s*(\d+)g×(\d+)$/);
-                        if (match) {
-                            const [, color, weight, qty] = match;
+                        // まず標準パターンで解析
+                        const standardMatch = product.match(/^(.+?):\s*(\d+)g×(\d+)$/);
+                        if (standardMatch) {
+                            const [, color, weight, qty] = standardMatch;
                             const key = `${color}:${weight}`;
                             
                             if (productMap[key]) {
-                                // 既存の商品があれば数量を加算
                                 productMap[key].qty += parseInt(qty);
                             } else {
-                                // 新しい商品として登録
                                 productMap[key] = {
                                     color: color,
                                     weight: parseInt(weight),
                                     qty: parseInt(qty)
                                 };
                             }
-                        } else {
-                            // パターンにマッチしない商品（不明商品など）
-                            const unknownKey = `unknown:${product}`;
-                            if (!productMap[unknownKey]) {
-                                productMap[unknownKey] = {
-                                    original: product,
-                                    isUnknown: true
-                                };
+                            return;
+                        }
+                        
+                        // 色名省略パターンをチェック
+                        const shortMatch = product.match(/^(\d+)g×(\d+)$/);
+                        if (shortMatch) {
+                            // 色名省略の場合、直前の色を推定する
+                            // より安全な方法：前のアイテムから色を継承するのではなく
+                            // 既存のproductMapから最も最近追加された色を取得
+                            const recentColors = Object.keys(productMap)
+                                .map(k => k.split(':')[0])
+                                .filter((v, i, a) => a.indexOf(v) === i); // 重複除去
+                            
+                            if (recentColors.length > 0) {
+                                // 最後に追加された色を使用
+                                const lastColor = recentColors[recentColors.length - 1];
+                                const [, weight, qty] = shortMatch;
+                                const key = `${lastColor}:${weight}`;
+                                
+                                if (productMap[key]) {
+                                    productMap[key].qty += parseInt(qty);
+                                } else {
+                                    productMap[key] = {
+                                        color: lastColor,
+                                        weight: parseInt(weight),
+                                        qty: parseInt(qty)
+                                    };
+                                }
+                                return;
                             }
                         }
+                        
+                        // どのパターンにもマッチしない場合は不明商品
+                        const unknownKey = `unknown:${product}`;
+                        if (!productMap[unknownKey]) {
+                            productMap[unknownKey] = {
+                                original: product,
+                                isUnknown: true
+                            };
+                        }
                     });
+                    
                     
                     // 色ごとにグループ化して表示用に整理
                     const colorGroups = {};
@@ -1220,6 +1250,7 @@
                             });
                         }
                     });
+                    
                     
                     // 最終的な商品名リストを作成
                     const finalProducts = [];
