@@ -1309,8 +1309,14 @@
                     };
                     
                     const fullProductName = order.productName || '';
-                    const truncatedProductName = fullProductName.substring(0, 25); // 全角25文字制限
-                    const hasOverflow = fullProductName.length > 25;
+                    let displayProductName = '';
+                    let detailProductName = '';
+                    
+                    // 25文字以下の場合のみ表示、超える場合は空欄
+                    if (fullProductName.length <= 25) {
+                        displayProductName = fullProductName;
+                    }
+                    // 25文字を超える場合はN列・P列ともに空欄
                     
                     const row = [
                         shipType, // 送り状種類：A（1kg以下）またはZ（1kg超過）
@@ -1329,9 +1335,9 @@
                         order.source === '楽天' ? 'JGSフィッシュ (楽天市場店)' :
                         order.source === 'Yahoo' ? 'JGSフィッシュ (yahoo!ｼｮｯﾋﾟﾝｸﾞ店)' :
                         'JGSフィッシュ', // ご依頼主名（ECサイト別）
-                        escapeCSV(truncatedProductName), // 品名１（全角25文字制限）
+                        escapeCSV(displayProductName), // 品名１（25文字以下のみ表示、超える場合は空欄）
                         Math.round(order.weight || 50),
-                        hasOverflow ? escapeCSV(fullProductName) : '', // 品名詳細（オーバーフロー時は完全版）
+                        detailProductName, // 品名詳細（25文字超過時は空欄）
                         '', // 不明品名
                         escapeCSV(order.orderId),
                         '', ''
