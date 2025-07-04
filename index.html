@@ -1402,11 +1402,27 @@
                     let displayProductName = '';
                     let detailProductName = '';
                     
-                    // 25文字以下の場合のみ表示、超える場合は空欄
-                    if (fullProductName.length <= 25) {
+                    // 全角25文字分（50バイト）の制限チェック
+                    function getByteLength(str) {
+                        let byteLength = 0;
+                        for (let i = 0; i < str.length; i++) {
+                            const char = str.charAt(i);
+                            // 全角文字（ひらがな、カタカナ、漢字、全角記号など）は2バイト
+                            if (char.match(/[^\x00-\x7F]/)) {
+                                byteLength += 2;
+                            } else {
+                                // 半角文字は1バイト
+                                byteLength += 1;
+                            }
+                        }
+                        return byteLength;
+                    }
+                    
+                    // 全角25文字分（50バイト）以下の場合のみ表示、超える場合は空欄
+                    if (getByteLength(fullProductName) <= 50) {
                         displayProductName = fullProductName;
                     }
-                    // 25文字を超える場合はN列・P列ともに空欄
+                    // 50バイトを超える場合はN列・P列ともに空欄
                     
                     const row = [
                         shipType, // 送り状種類：A（1kg以下）またはZ（1kg超過）
