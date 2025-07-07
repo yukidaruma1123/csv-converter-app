@@ -1169,6 +1169,9 @@
                             const masterInfo = productMaster[cleanItemCode];
                             console.log(`Searching for ${cleanItemCode}:`, masterInfo);
                             
+                            // 単一商品用の一時商品リスト
+                            const tempProducts = [];
+                            
                             if (masterInfo && masterInfo.colorSets) {
                                 // 複数カラーセット対応
                                 masterInfo.colorSets.forEach(set => {
