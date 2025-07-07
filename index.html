@@ -1060,11 +1060,18 @@
                                 
                                 console.log(`Yahoo multiple item: ${item} -> ${cleanItemCode}`);
                                 
-                                // QuantityDetailから該当商品の数量を取得（例: bara60:2,bara80:1）
+                                // QuantityDetailから該当商品の数量を取得（例: L1=1&L2=2 から L1の数量を取得）
                                 let quantity = 1;
                                 if (quantityDetail) {
-                                    const quantityMatch = quantityDetail.match(new RegExp(`${cleanItemCode}:(\\d+)`));
-                                    quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+                                    // L1=bara80&L2=605 の場合、L1やL2の番号を抽出
+                                    const itemIndex = item.match(/^(L\d+)=/);
+                                    if (itemIndex) {
+                                        const indexName = itemIndex[1]; // "L1" or "L2"
+                                        const quantityPattern = new RegExp(`${indexName}\\s*=\\s*(\\d+)`);
+                                        const quantityMatch = quantityDetail.match(quantityPattern);
+                                        quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+                                        console.log(`Quantity for ${indexName}: ${quantity}`);
+                                    }
                                 }
                                 
                                 const masterInfo = productMaster[cleanItemCode];
@@ -1142,8 +1149,6 @@
                             productDetails.push(...unknownItems);
                         } else {
                             // 単一商品の場合（例: L1=bara60）
-                            const quantity = parseInt(quantityDetail) || 1;
-                            
                             // 単一商品でも = より後ろを取得
                             let cleanItemCode = itemId;
                             if (itemId && itemId.includes('=')) {
@@ -1151,29 +1156,90 @@
                             }
                             
                             console.log(`Yahoo single item: ${itemId} -> ${cleanItemCode}`);
+                            
+                            // QuantityDetailから数量を取得（例: L1=2 → 2）
+                            let quantity = 1;
+                            if (quantityDetail) {
+                                // L1=2 の形式から数量を抽出
+                                const quantityMatch = quantityDetail.match(/L\d+\s*=\s*(\d+)/);
+                                quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+                                console.log(`Quantity from QuantityDetail: ${quantityDetail} -> ${quantity}`);
+                            }
+                            
                             const masterInfo = productMaster[cleanItemCode];
                             console.log(`Searching for ${cleanItemCode}:`, masterInfo);
                             
                             if (masterInfo && masterInfo.colorSets) {
                                 // 複数カラーセット対応
-                                let unitTotalWeight = 0;
-                                const detailParts = [];
-                                
                                 masterInfo.colorSets.forEach(set => {
-                                    unitTotalWeight += set.weight * set.quantity;
-                                    detailParts.push(`${set.color}: ${set.weight}g×${set.quantity * quantity}`);
+                                    const itemTotalWeight = set.weight * set.quantity * quantity;
+                                    totalWeight += itemTotalWeight;
+                                    tempProducts.push({
+                                        color: set.color,
+                                        weight: set.weight,
+                                        qty: set.quantity * quantity
+                                    });
+                                    totalQuantity += quantity;
                                 });
-                                
-                                totalWeight = unitTotalWeight * quantity;
-                                productDetails.push(detailParts.join(', '));
                             } else {
                                 console.log(`Product not found in master: ${cleanItemCode}`);
                                 // 商品マスタにない場合、タイトルから重量推定
                                 const weightMatch = title?.match(/(\d+)g/);
                                 totalWeight = weightMatch ? parseInt(weightMatch[1]) * quantity : 50 * quantity;
-                                productDetails.push(`不明商品: ${cleanItemCode}`);
+                                tempProducts.push({
+                                    unknown: true,
+                                    text: `不明商品: ${cleanItemCode}`
+                                });
+                                totalQuantity = quantity;
                             }
-                            totalQuantity = quantity;
+                            
+                            // 同じ色の商品を統合
+                            const colorMap = {};
+                            const unknownItems = [];
+                            
+                            tempProducts.forEach(product => {
+                                if (product.unknown) {
+                                    unknownItems.push(product.text);
+                                } else {
+                                    const key = `${product.color}:${product.weight}`;
+                                    if (colorMap[key]) {
+                                        colorMap[key].qty += product.qty;
+                                    } else {
+                                        colorMap[key] = {
+                                            color: product.color,
+                                            weight: product.weight,
+                                            qty: product.qty
+                                        };
+                                    }
+                                }
+                            });
+                            
+                            // 色ごとにグループ化して表示形式に変換
+                            const colorGroups = {};
+                            Object.values(colorMap).forEach(item => {
+                                if (!colorGroups[item.color]) {
+                                    colorGroups[item.color] = [];
+                                }
+                                colorGroups[item.color].push({
+                                    weight: item.weight,
+                                    qty: item.qty
+                                });
+                            });
+                            
+                            // 色ごとに重量順ソートして色名省略を適用
+                            Object.keys(colorGroups).sort().forEach(color => {
+                                const items = colorGroups[color].sort((a, b) => a.weight - b.weight);
+                                items.forEach((item, index) => {
+                                    if (index === 0) {
+                                        productDetails.push(`${color}: ${item.weight}g×${item.qty}`);
+                                    } else {
+                                        productDetails.push(`${item.weight}g×${item.qty}`);
+                                    }
+                                });
+                            });
+                            
+                            // 不明商品を追加
+                            productDetails.push(...unknownItems);
                         }
                     }
 
